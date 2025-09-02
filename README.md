@@ -31,7 +31,7 @@ It’s a **C# .NET console application** with:
 ## Clone & Build
 ```bash
 git clone https://github.com/TonBatbaatar/chinese-chess-game.git
-cd chinese-chess-game
+cd chinese-chess-game/ChineseChess.ConsoleSolution
 dotnet build
 ```
 
