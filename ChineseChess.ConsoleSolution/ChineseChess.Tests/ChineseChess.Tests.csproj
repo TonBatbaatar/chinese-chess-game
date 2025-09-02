@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChineseChessConsole\ChineseChessConsole.csproj" />
+    <ProjectReference Include="..\ChineseChess.Console\ChineseChess.Console.csproj" />
   </ItemGroup>
 
 </Project>
