@@ -3,6 +3,15 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Local DB files
+*.db
+*.sqlite
+
+# Build artifacts
+bin/
+obj/
+.vs/
+
 # User-specific files
 *.rsuser
 *.suo
