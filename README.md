@@ -57,21 +57,22 @@ This repo demonstrates:
 - **Tailwind CSS 4** (modern styling)
 - (Planned) React Router for navigation
 
-## Requirements:
+---
 
-- [.NET 6 SDK](https://dotnet.microsoft.com/download) (or newer)
-- Both machines or terminals should be on the same network or use localhost for local testing.
-- Open firewall/antivirus settings if needed (especially for server).
-- Use the same executable or project on both ends.
+## 🚀 Getting Started
 
-## Clone & Build
+## Clone
 ```bash
 git clone https://github.com/TonBatbaatar/chinese-chess-game.git
-cd chinese-chess-game/ChineseChess.ConsoleSolution
-dotnet build
 ```
 
-## How to Run Multi-Player Game:
+## How to Run Console Local Game:
+```bash
+   cd ChineseChess.ConsoleSolution/ChineseChess.Console
+   dotnet run
+```
+
+## How to Run a Console Multi-Player Game:
 
 ### 🔴 Terminal 1: Host (Server)
 1. Open the first terminal.  
@@ -103,8 +104,43 @@ dotnet build
    ```
    Once connected, the game will begin.
 
-## 🛠️ Tech Stack
-- Language: C#
-- Framework: .NET Core
-- Networking: System.Net.Sockets
-- Architecture: Client–Server model
+## How to Run a Web App Chess Game:
+1. Run the backend server
+   ```bash
+   cd ChineseChess.WebSolution/ChineseChess.Api
+   dotnet run
+   ```
+2. Open another terminal (same machine or another).
+3. Run the frontend client
+   ```bash
+   cd ChineseChess.WebSolution/ChineseChess.FrontEnd
+   npm install
+   npm run dev
+   ```
+4. Open http://localhost:5173 in your browser.
+5. Create a game (Game ID will be shown) → open another tab → join game → play moves.
+
+## 🛠 Roadmap
+
+- [x] **v0.1.0 — Console Edition**
+  - Local 2-player Chinese Chess (Red vs Black)
+  - Board rendering with coordinates & colors
+  - Piece movement validation + check/checkmate rules
+  - Online play via TCP (host/join)
+
+- [x] **v0.2.0 — Web App Prototype**
+  - ASP.NET Core + SignalR backend
+  - React + TypeScript + Vite + Tailwind frontend
+  - Guest Play mode (create/join game by ID)
+  - Board UI with axis labels, river line, colored pieces
+
+- [ ] **v0.3.0 — Web App Enhancements**
+  - User authentication (register, login, guest)
+  - Match history + saved games (EF Core + SQLite)
+  - Richer board UI (palaces, diagonals, clickable moves)
+  - Deployment to Azure (backend + frontend)
+
+- [ ] **v1.0.0 — Full Release**
+  - Polished web app with matchmaking, AI opponent, and leaderboards
+  - Production-grade deployment (CI/CD, cloud hosting)
+   
