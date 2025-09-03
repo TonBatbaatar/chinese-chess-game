@@ -1,25 +1,61 @@
-# Chinese Chess (Xiangqi) — Console Edition · v0.1.0
+# Chinese Chess (Xiangqi) — Console Edition + Web App prototype · v0.2.0
 
-This is the first public release of my Chinese Chess (Xiangqi) project.  
-It’s a **C# .NET console application** with:
+A learning + showcase project that brings **Chinese Chess (Xiangqi)** to life in both a **C# .NET console app** and an evolving **web app** (ASP.NET Core backend + React/TypeScript frontend).  
 
-- Rule-checked **piece movement validation**
-- Turn-based **Red vs Black**
-- **Online multiplayer** via a simple **client–server** model using `System.Net.Sockets`
-- Text (ASCII) board rendering in the terminal
+This repo demonstrates:
+- ✅ A playable **local console game** (full rules, check/checkmate, etc.)
+- ✅ Basic **online play** via TCP (console edition)  
+- ✅ **ASP.NET Core + SignalR** backend for multiplayer over the web  
+- 🚧 **React + TypeScript + Vite + Tailwind CSS** frontend with login/register/guest play UI  
+- 🚧 In-progress **full multiplayer web client** (play via browser, real-time board updates)  
 
-> Newer versions evolve into a web app, but this repo preserves the original console experience.
+---
+
+## ✨ Features (v0.2.0)
+
+### Console App
+- Local 2-player Chinese Chess (Red vs Black)
+- Board rendering in terminal with colors & coordinates
+- Full rules implemented:
+  - Valid moves per piece
+  - Check & checkmate detection
+  - Special General-facing rule
+- Online mode (host/join with TCP client & server)
+
+### Web App Prototype
+- **Backend (ASP.NET Core)**:
+  - SignalR hub (`/hub/game`) for real-time moves
+  - Game session creation & joining
+  - Board state broadcasting
+- **Frontend (React + TS + Vite + Tailwind)**:
+  - Modern login/register/guest entry UI
+  - **Guest Play mode**:
+    - Create game, share Game ID
+    - Join existing game
+    - Send moves, board updates in real-time
+  - Chessboard with:
+    - Axis labels (A–I, 1–10)
+    - River line divider
+    - Red vs Black piece coloring
+    - Dashed border & clean layout
 
 ---
 
-## Features
+## 📦 Tech Stack
 
-- ✅ Legal move enforcement for all Xiangqi pieces (General, Advisors, Elephants, Horses, Chariots, Cannons, Soldiers)
-- ✅ Turn order and basic check/checkmate detection
-- ✅ Socket-based networking (server + client) for remote play
-- ✅ Clear, minimal console UI
+### Backend
+- **C# .NET 8** (Console + ASP.NET Core Web API)
+- **SignalR** for real-time communication
+- (Planned) **EF Core + SQLite** for:
+  - User accounts
+  - Match history
+  - Saved games
 
----
+### Frontend
+- **React 19 + TypeScript**
+- **Vite 7** (fast dev server + build tool)
+- **Tailwind CSS 4** (modern styling)
+- (Planned) React Router for navigation
 
 ## Requirements:
 
