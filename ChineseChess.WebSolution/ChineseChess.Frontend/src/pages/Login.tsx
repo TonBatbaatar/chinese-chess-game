@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -18,18 +21,10 @@ export default function Login() {
     try {
       setSubmitting(true);
 
-      // If your ASP.NET endpoint is cookie-based auth:
-      // const res = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   credentials: 'include',
-      //   body: JSON.stringify({ email, password }),
-      // });
-
-      // If your ASP.NET endpoint returns a JWT:
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',   // cookie-based login
         body: JSON.stringify({ email, password }),
       });
 
@@ -38,13 +33,7 @@ export default function Login() {
         throw new Error(msg || 'Login failed');
       }
 
-      // For JWT: { token: "..." }
-      // const { token } = await res.json();
-      // localStorage.setItem('token', token);
-
-      // For cookie-based, nothing to store — server set httpOnly cookie
-
-      alert("Login success! (wire up navigation to your Home page here)");
+      navigate('/guest'); // or `/home` later
     } catch (err) {
       setError(String(err));
     } finally {
@@ -104,10 +93,10 @@ export default function Login() {
             {submitting ? "Signing in..." : "Sign in"}
           </button>
 
-          <div className="text-center text-sm text-gray-600">
-            <a href="/register" className="text-blue-600 hover:underline">Create account</a>
+          <div className="mt-4 text-center">
+            <Link to="/register" className="text-blue-600 hover:underline">Register</Link>
             <span className="mx-2">•</span>
-            <a href="/guest" className="text-gray-700 hover:underline">Play as Guest</a>
+            <Link to="/guest" className="text-gray-700 hover:underline">Play as Guest</Link>
           </div>
         </form>
       </div>
