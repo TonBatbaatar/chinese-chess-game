@@ -11,12 +11,11 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // SQLLite database with EF
-builder.Services.AddDbContext<ApplicationDbContext>(opt => opt.UseSqlite("Data Source=chinesechess.db"));
+builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite("Data Source=chinesechess.db"));
 
 // builder.Services.AddIdentity<ApplicationUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddSignalR();
 builder.Services.AddControllers();
-// builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(_ => true)));
 
 builder.Services.AddCors(opt =>
 {
@@ -28,6 +27,9 @@ builder.Services.AddCors(opt =>
 
 // Register in-memory game store
 builder.Services.AddSingleton<ChineseChess.Api.Game.IGameStore, ChineseChess.Api.Game.InMemoryGameStore>();
+builder.Services.AddSingleton<ChineseChess.Api.Game.BoardSerializer>();  // helper
+builder.Services.AddScoped<ChineseChess.Api.Game.IGameStore, ChineseChess.Api.Game.PersistentGameStore>();
+
 
 var app = builder.Build();
 
