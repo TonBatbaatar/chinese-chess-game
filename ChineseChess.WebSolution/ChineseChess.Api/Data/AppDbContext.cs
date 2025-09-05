@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChineseChess.Api.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : IdentityDbContext<ApplicationUser>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -11,11 +12,5 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<GameRecord>()
-            .Property(x => x.StateJson)
-            .HasColumnType("TEXT");
-        modelBuilder.Entity<GameRecord>()
-            .Property(x => x.MovesJson)
-            .HasColumnType("TEXT");
     }
 }

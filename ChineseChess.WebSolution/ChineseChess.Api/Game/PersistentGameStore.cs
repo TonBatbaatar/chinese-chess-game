@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Security.Claims;
 using ChineseChess.Api.Data;
 using ChineseChess.Engine;
 using Microsoft.EntityFrameworkCore;
@@ -10,17 +11,20 @@ public class PersistentGameStore : IGameStore
 {
     private readonly AppDbContext _db;
     private readonly BoardSerializer _ser;
+    private readonly IHttpContextAccessor _http; // add accessor to read user in Controllers, but in Hub pass from Context
+
 
     // Hot cache for active games: Id -> GameSession
     private readonly ConcurrentDictionary<Guid, GameSession> _active = new();
 
-    public PersistentGameStore(AppDbContext db, BoardSerializer ser)
+    public PersistentGameStore(AppDbContext db, BoardSerializer ser, IHttpContextAccessor http)
     {
         _db = db;
         _ser = ser;
+        _http = http;
     }
 
-    public GameSession CreateLocal()
+    public GameSession CreateLocal(string? creatorUserId = null)
     {
         var board = new Board();
         board.InitializeLocalBoard();
@@ -33,6 +37,7 @@ public class PersistentGameStore : IGameStore
             Id = id,
             StateJson = _ser.ToJson(board),
             MovesJson = "[]",
+            CreatorUserId = creatorUserId, // may be null (guest)
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
             IsFinished = false

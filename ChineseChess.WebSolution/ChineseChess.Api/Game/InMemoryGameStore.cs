@@ -8,7 +8,7 @@ public class InMemoryGameStore : IGameStore
 {
     private readonly ConcurrentDictionary<Guid, GameSession> _games = new();
 
-    public GameSession CreateLocal()
+    public GameSession CreateLocal(string? creatorUserId = null)
     {
         var board = new Board();
         board.InitializeLocalBoard(); // use existing method

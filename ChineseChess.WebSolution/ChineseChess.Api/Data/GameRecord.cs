@@ -15,6 +15,13 @@ public class GameRecord
     [Required]
     public string MovesJson { get; set; } = "[]";
 
+    // Who created the room / owns it (nullable for guests)
+    public string? CreatorUserId { get; set; }
+
+    // bind player with the game record
+    public string? RedUserId { get; set; }
+    public string? BlackUserId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 

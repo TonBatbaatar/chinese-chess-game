@@ -1,3 +1,4 @@
+// Controllers/AuthController.cs
 using ChineseChess.Api.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -9,27 +10,50 @@ namespace ChineseChess.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _users;
-    public AuthController(UserManager<ApplicationUser> users) => _users = users;
+    private readonly SignInManager<ApplicationUser> _signIn;
+
+    public AuthController(UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signIn)
+    {
+        _users = users;
+        _signIn = signIn;
+    }
+
+    public record RegisterRequest(string Email, string Password);
+    public record LoginRequest(string Email, string Password);
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterDto dto)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest req)
     {
-        var user = new ApplicationUser { UserName = dto.Username, Email = dto.Email };
-        var result = await _users.CreateAsync(user, dto.Password);
-        if (!result.Succeeded) return BadRequest(result.Errors);
+        var user = new ApplicationUser { UserName = req.Email, Email = req.Email };
+        var result = await _users.CreateAsync(user, req.Password);
+        if (!result.Succeeded) return BadRequest(string.Join("; ", result.Errors.Select(e => e.Description)));
         return Ok();
     }
 
-    // For demo you can return a dummy token or set cookie after sign-in
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginDto dto)
+    public async Task<IActionResult> Login([FromBody] LoginRequest req)
     {
-        var user = await _users.FindByNameAsync(dto.Username);
-        if (user == null) return Unauthorized();
-        // Use SignInManager or PasswordHasher to validate
+        var user = await _users.FindByEmailAsync(req.Email);
+        if (user is null) return Unauthorized("Invalid credentials.");
+
+        var result = await _signIn.PasswordSignInAsync(user, req.Password, isPersistent: true, lockoutOnFailure: false);
+        if (!result.Succeeded) return Unauthorized("Invalid credentials.");
+
+        // Cookie is set automatically; return 200
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        await _signIn.SignOutAsync();
         return Ok();
+    }
+
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        if (!User.Identity?.IsAuthenticated ?? true) return Ok(new { authenticated = false });
+        return Ok(new { authenticated = true, userId = _users.GetUserId(User), email = User.Identity!.Name });
     }
 }
-
-public record RegisterDto(string Username, string Email, string Password);
-public record LoginDto(string Username, string Password);

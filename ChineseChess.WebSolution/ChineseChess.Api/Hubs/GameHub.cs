@@ -16,10 +16,13 @@ public class GameHub : Hub
 
     public GameHub(IGameStore store) => _store = store;
 
+    private string? UserId => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
     // Create a new local game and auto-join caller to its room
     public async Task<CreateGameResult> CreateGame()
     {
-        var session = _store.CreateLocal();        // uses existing board.InitializeLocalBoard()
+        var session = _store.CreateLocal(UserId); // uses existing board.InitializeLocalBoard()
+
         string room = session.Id.ToString();
 
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
