@@ -1,6 +1,6 @@
 # Chinese Chess (Xiangqi) — Web App
 
-**Status:** v0.2.0 (in development)  
+**Status:** v0.3.0 (in development)  
 **Stack:** ASP.NET Core · EF Core · SignalR · React (Vite + TS) · Tailwind · Azure
 
 ## Live (coming soon)
