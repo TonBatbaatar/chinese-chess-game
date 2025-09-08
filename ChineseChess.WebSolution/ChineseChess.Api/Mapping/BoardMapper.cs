@@ -1,4 +1,3 @@
-// ChineseChess.Api/Mapping/BoardMapper.cs
 using ChineseChess.Engine;
 
 namespace ChineseChess.Api.Mapping;

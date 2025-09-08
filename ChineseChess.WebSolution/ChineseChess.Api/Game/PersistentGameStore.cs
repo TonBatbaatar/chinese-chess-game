@@ -9,19 +9,16 @@ namespace ChineseChess.Api.Game;
 
 public class PersistentGameStore : IGameStore
 {
-    private readonly AppDbContext _db;
-    private readonly BoardSerializer _ser;
-    private readonly IHttpContextAccessor _http; // add accessor to read user in Controllers, but in Hub pass from Context
+    private readonly AppDbContext _db; // Scoped
+    private readonly BoardSerializer _ser; // Singleton
+    private readonly IGameSessionCache _cache; // Singleton
 
 
-    // Hot cache for active games: Id -> GameSession
-    private readonly ConcurrentDictionary<Guid, GameSession> _active = new();
-
-    public PersistentGameStore(AppDbContext db, BoardSerializer ser, IHttpContextAccessor http)
+    public PersistentGameStore(AppDbContext db, BoardSerializer ser, IGameSessionCache cache)
     {
         _db = db;
         _ser = ser;
-        _http = http;
+        _cache = cache;
     }
 
     public GameSession CreateLocal(string? creatorUserId = null)
@@ -31,6 +28,9 @@ public class PersistentGameStore : IGameStore
 
         var session = new GameSession(board);
         var id = session.Id;
+
+        // warm cache
+        _cache.Set(session);
 
         var record = new GameRecord
         {
@@ -46,22 +46,24 @@ public class PersistentGameStore : IGameStore
         _db.Games.Add(record);
         _db.SaveChanges();
 
-        _active[id] = session;
         return session;
     }
 
     public GameSession? Get(Guid id)
     {
-        if (_active.TryGetValue(id, out var cached))
+        if (_cache.TryGet(id, out var cached))
             return cached;
 
         var rec = _db.Games.AsNoTracking().FirstOrDefault(g => g.Id == id);
         if (rec is null) return null;
 
         var board = _ser.FromJson(rec.StateJson);
-        var session = new GameSession(board) { };
+        var session = new GameSession(board)
+        {
+            // (optionally rehydrate seats from DB if later)
+        };
 
-        _active[id] = session;
+        _cache.Set(session);
         return session;
     }
 
@@ -83,6 +85,24 @@ public class PersistentGameStore : IGameStore
             return false;
         }
 
+        var board = session.Board;
+        var moving = board.Grid[fromPos.row, fromPos.col];
+
+        // 1) Must move something
+        if (moving == null || moving.Type == PieceType.None)
+        {
+            error = "No piece at source.";
+            return false;
+        }
+
+        // 2) Must be current player's piece (TURN ENFORCEMENT)
+        if (moving.Owner != board.CurrentPlayer)
+        {
+            error = "Not your turn.";
+            return false;
+        }
+
+        // 3) Regular legality checks (your existing rules)
         // Validate move
         if (!session.Board.CanMove(fromPos.row, fromPos.col, toPos.row, toPos.col))
         {
@@ -90,12 +110,15 @@ public class PersistentGameStore : IGameStore
             return false;
         }
 
-        // Apply move
+        // 4) Apply move
         if (!session.Board.MovePiece(fromPos.row, fromPos.col, toPos.row, toPos.col))
         {
             error = "Move failed.";
             return false;
         }
+
+        // 5) switch player with a successive move
+        session.Board.SwitchPlayer();
 
         // Update in DB (snapshot + append move)
         var rec = _db.Games.FirstOrDefault(g => g.Id == id);

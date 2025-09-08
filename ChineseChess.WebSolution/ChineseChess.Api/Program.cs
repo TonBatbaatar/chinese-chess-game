@@ -2,6 +2,7 @@ using ChineseChess.Api.Data;
 using ChineseChess.Api;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ChineseChess.Api.Game;
 using Microsoft.OpenApi.Models; //for swagger
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +23,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
+// cache services
+builder.Services.AddMemoryCache(); // IMemoryCache (singleton)
+builder.Services.AddSingleton<IGameSessionCache, InMemoryGameSessionCache>();
+
+builder.Services.AddAuthentication(); // Identity already registers this
+builder.Services.AddAuthorization();
 
 // builder.Services.AddIdentity<ApplicationUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddSignalR();
@@ -41,8 +48,8 @@ builder.Services.AddCors(options =>
 });
 
 // Game Services: Register in-memory game store
-builder.Services.AddSingleton<ChineseChess.Api.Game.BoardSerializer>();  // helper
-builder.Services.AddScoped<ChineseChess.Api.Game.IGameStore, ChineseChess.Api.Game.PersistentGameStore>();
+builder.Services.AddSingleton<BoardSerializer>();  // helper
+builder.Services.AddScoped<IGameStore, PersistentGameStore>();
 
 
 var app = builder.Build();

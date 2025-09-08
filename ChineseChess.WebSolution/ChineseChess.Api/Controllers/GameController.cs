@@ -16,11 +16,17 @@ public class GamesController : ControllerBase
 
     // POST api/games
     [HttpPost]
-    public ActionResult<CreateGameResponse> Create()
+    public ActionResult<CreateGameResult> Create()
     {
-        var session = _store.CreateLocal();
+        var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var session = _store.CreateLocal(userId);
+
+        // Assign creator as Red (connection-based seat happens in Hub, but here we mimic it)
+        session.RedUserId = userId;
+
         var boardDto = BoardMapper.ToDto(session.Board);
-        return Ok(new CreateGameResponse(session.Id, session.CurrentTurn, boardDto));
+
+        return Ok(new CreateGameResult(session.Id, session.Board.CurrentPlayer.Color.ToString(), boardDto, "Red"));
     }
 
     // GET api/games/{id}

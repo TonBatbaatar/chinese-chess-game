@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 using ChineseChess.Api.Game;
 using ChineseChess.Api.Mapping;
+using ChineseChess.Api.Contracts;
 using Microsoft.AspNetCore.SignalR;
 
 namespace ChineseChess.Api;
@@ -21,15 +22,21 @@ public class GameHub : Hub
     // Create a new local game and auto-join caller to its room
     public async Task<CreateGameResult> CreateGame()
     {
-        var session = _store.CreateLocal(UserId); // uses existing board.InitializeLocalBoard()
+        var userId = UserId;
+        var session = _store.CreateLocal(userId); // uses existing board.InitializeLocalBoard()
 
         string room = session.Id.ToString();
+
+        // Creator becomes Red by default (connection-based)
+        session.RedConnectionId = Context.ConnectionId;
+        session.RedUserId ??= UserId;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
 
         // send initial board state only to the creator
         var boardDto = BoardMapper.ToDto(session.Board);
-        return new CreateGameResult(room, boardDto);
+
+        return new CreateGameResult(session.Id, session.Board.CurrentPlayer.Color.ToString(), boardDto, "Red");
     }
 
     // Join existing game by id (room)
@@ -41,6 +48,13 @@ public class GameHub : Hub
 
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
 
+        // Auto-assign Black if free, otherwise leave as spectator
+        if (session.BlackConnectionId is null && Context.ConnectionId != session.RedConnectionId)
+        {
+            session.BlackConnectionId = Context.ConnectionId;
+            session.BlackUserId ??= UserId;
+        }
+
         // Send current state to the client who just joined
         var boardDto = BoardMapper.ToDto(session.Board);
         await Clients.Caller.SendAsync("State", boardDto);
@@ -50,20 +64,50 @@ public class GameHub : Hub
     }
 
     // Make a move: server validates via engine and broadcasts updated state if valid
-    public async Task<MoveResult> MakeMove(string gameId, string from, string to)
+    public async Task<MoveResponse> MakeMove(string gameId, string from, string to)
     {
         if (!Guid.TryParse(gameId, out var id))
-            return new MoveResult(false, "Invalid game id");
+            return new MoveResponse(false, "Invalid game id", null);
 
+        var session = _store.Get(id);
+        if (session is null)
+            return new MoveResponse(false, "Game not found", null);
+
+        var board = session.Board;
+        if (board is null)
+            return new MoveResponse(false, "Board not initialized.", null);
+
+        var callerSeat = session.SeatOf(Context.ConnectionId);
+        if (callerSeat is null)
+            return new MoveResponse(false, "You are a spectator. Claim a seat.", BoardMapper.ToDto(board));
+
+        var expectedSeat = board.CurrentPlayer.Color.ToString(); // "Red" or "Black"
+
+
+        // 1) Seat must match current turn
+        if (!string.Equals(callerSeat, expectedSeat, StringComparison.OrdinalIgnoreCase))
+            return new MoveResponse(false, "Not your turn.", BoardMapper.ToDto(board));
+
+        // 2) Must be moving your own color’s piece
+        if (!Parser.TryParseCoordinate(from, out var fromPos))
+            return new MoveResponse(false, "Bad 'from' coordinate.", BoardMapper.ToDto(board));
+
+        var moving = board.Grid[fromPos.row, fromPos.col];
+        var movingOwner = moving.Owner?.Color.ToString(); // "Red"/"Black"/"None"
+
+        if (!string.Equals(movingOwner, callerSeat, StringComparison.OrdinalIgnoreCase))
+            return new MoveResponse(false, "You can only move your own pieces.", BoardMapper.ToDto(board));
+
+        // 3) Delegate to store for full rules + persistence
         if (!_store.TryApplyMove(id, from, to, out var error))
-            return new MoveResult(false, error ?? "Move rejected");
+            return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
 
-        var session = _store.Get(id)!;
-        var boardDto = BoardMapper.ToDto(session.Board);
 
-        // broadcast to everyone in the room
-        await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, boardDto);
-        return new MoveResult(true, null);
+
+
+        // Broadcast new state
+        await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
+        return new MoveResponse(true, null, BoardMapper.ToDto(board));
     }
 
     // Let a client ask for the latest state explicitly
@@ -76,5 +120,4 @@ public class GameHub : Hub
         return true;
     }
 }
-public record CreateGameResult(string GameId, object Board);
-public record MoveResult(bool Ok, string? Error);
+

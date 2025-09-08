@@ -1,0 +1,48 @@
+# Ensure consistent line endings (LF) in the repo
+* text=auto eol=lf
+
+# C# / .NET files
+*.cs   text diff=csharp
+*.csproj text
+*.sln   text
+
+# TypeScript / JavaScript
+*.ts   text
+*.tsx  text
+*.js   text
+*.jsx  text
+
+# JSON / Config
+*.json text
+*.yml  text
+*.yaml text
+*.xml  text
+
+# Styles
+*.css  text
+*.scss text
+
+# Documentation
+*.md   text
+*.txt  text
+
+# Shell / Scripts
+*.sh   text eol=lf
+*.bat  text eol=crlf
+
+# Ignore binary files (don’t mess with line endings)
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.dll  binary
+*.exe  binary
+
+# VSCode settings
+.vscode/* text
+
+# Optional: enforce LF on git attributes itself
+.gitattributes text eol=lf
+.gitignore     text eol=lf
