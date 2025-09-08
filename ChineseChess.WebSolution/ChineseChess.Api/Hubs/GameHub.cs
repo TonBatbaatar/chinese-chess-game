@@ -12,7 +12,6 @@ namespace ChineseChess.Api;
 public class GameHub : Hub
 {
 
-    // v0.1.0: In memory (without Database) version
     private readonly IGameStore _store;
 
     public GameHub(IGameStore store) => _store = store;
@@ -23,7 +22,7 @@ public class GameHub : Hub
     public async Task<CreateGameResult> CreateGame()
     {
         var userId = UserId;
-        var session = _store.CreateLocal(userId); // uses existing board.InitializeLocalBoard()
+        var session = _store.CreateLocal(userId);
 
         string room = session.Id.ToString();
 

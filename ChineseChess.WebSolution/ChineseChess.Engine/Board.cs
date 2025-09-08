@@ -19,6 +19,10 @@ public class Board
         InitializeEmptyBoard();
     }
 
+    /// <summary>
+    /// initialize the board with Empty piece type
+    /// called by constructor by default
+    /// </summary>
     private void InitializeEmptyBoard()
     {
         for (int r = 0; r < Rows; r++)
@@ -30,6 +34,9 @@ public class Board
         }
     }
 
+    /// <summary>
+    /// initialize board with pieces with initial position
+    /// </summary>
     public void InitializeLocalBoard()
     {
         // Red bottom side (rows 7–9)
@@ -329,68 +336,6 @@ public class Board
         return false;
     }
 
-    public void PrintBoard()
-    {
-        ConsoleColor redColor = ConsoleColor.Red;
-        ConsoleColor blackColor = ConsoleColor.DarkYellow;
-        ConsoleColor borderColor = ConsoleColor.Cyan;
-
-        string horizontalLabels = "    A   B   C   D   E   F   G   H   I";
-        string horizontalBorder = "  +" + string.Join("", Enumerable.Repeat("---+", Columns));
-
-        Console.ForegroundColor = borderColor;
-        Console.WriteLine(horizontalLabels); // Top A–I
-        Console.WriteLine(horizontalBorder);
-        Console.ResetColor();
-
-        for (int r = 0; r < Rows; r++)
-        {
-            Console.ForegroundColor = borderColor;
-            Console.Write($"{(r + 1),2}|"); // Row number with padding
-            Console.ResetColor();
-
-            for (int c = 0; c < Columns; c++)
-            {
-                var piece = Grid[r, c];
-
-                if (piece.Type == PieceType.None)
-                {
-                    Console.Write(" . "); // Empty spot
-                }
-                else
-                {
-                    Console.ForegroundColor = piece.Owner == PlayerRed ? redColor :
-                                            piece.Owner == PlayerBlack ? blackColor : Console.ForegroundColor;
-
-                    Console.Write($" {piece.ToString()} ");
-                    Console.ResetColor();
-                }
-
-                Console.ForegroundColor = borderColor;
-                Console.Write("|");
-                Console.ResetColor();
-            }
-
-            Console.WriteLine();
-
-            // Separator after each row
-            Console.ForegroundColor = borderColor;
-            Console.WriteLine(horizontalBorder);
-            Console.ResetColor();
-
-            // Optional: thicker line between red and black territory
-            if (r == 4)
-            {
-                Console.ForegroundColor = borderColor;
-                Console.WriteLine("   " + new string('=', Columns * 4)); // visual mid-line
-                Console.ResetColor();
-            }
-        }
-
-        Console.ForegroundColor = borderColor;
-        Console.WriteLine(horizontalLabels); // Bottom A–I
-        Console.ResetColor();
-    }
 
     public void SwitchPlayer()
     {
