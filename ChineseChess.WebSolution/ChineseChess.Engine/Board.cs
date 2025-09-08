@@ -64,8 +64,61 @@ public class Board
         return false;
     }
 
+    /// <summary>
+    /// not used yet!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    /// Detects draw conditions per common Chinese Chess rules. This method handles:
+    /// 1) Theoretical/insufficient-material draws based on current material only.
+    /// 2) Threefold/cyclic repetition (via caller-provided count).
+    /// 3) Perpetual check or capture flags (caller-provided).
+    /// 4) 60-move natural limit (via caller-provided halfmove count since last capture or pawn move).
+    ///
+    /// Notes:
+    /// - For repetition/perpetual/60-move rules, pass your tracked values from the game loop.
+    ///   * noProgressHalfMoves: half-move clock since the last capture or pawn (bing/zu) move.
+    ///   * repetitionCount: how many times the current position (including side-to-move) has occurred.
+    ///   * perpetualCheckDetected / perpetualCaptureDetected: set these based on your repetition detection logic.
+    /// - Pure "trapped with no moves" stalemate is NOT auto-declared a draw here because it’s nuanced in Xiangqi;
+    ///   your game-end logic (win/loss/draw) should decide using IsInCheck + HasAnyLegalMoves if you adopt special exceptions.
+    /// </summary>
+    public bool IsDraw(out string reason, int noProgressHalfMoves = 0, int repetitionCount = 1, bool perpetualCheckDetected = false, bool perpetualCaptureDetected = false)
+    {
+        // -------- 1) Theoretical / Insufficient-material draws (current board only) --------
+        if (IsTheoreticalDraw(out reason))
+            return true;
 
+        // -------- 2) Repetition / Cycles --------
+        // Many competitions treat threefold (or more) repetition/cycles without winning chances as a draw.
+        // If you differentiate forced-win vs no-win cycles, gate this with your own flag; here we accept >=3 as draw.
+        if (repetitionCount >= 3)
+        {
+            reason = "Draw by cyclic repetition (≥3 occurrences of the same position).";
+            return true;
+        }
 
+        // -------- 3) Perpetual check / capture (forbidden one-sided loops) --------
+        if (perpetualCheckDetected)
+        {
+            reason = "Draw by perpetual checking (continuous checking loop).";
+            return true;
+        }
+        if (perpetualCaptureDetected)
+        {
+            reason = "Draw by perpetual capture/harassment (continuous capture loop).";
+            return true;
+        }
+
+        // -------- 4) 60-move natural limit (no capture and no pawn move) --------
+        // 60 full moves = 120 half-moves.
+        if (noProgressHalfMoves >= 120)
+        {
+            reason = "Draw by 60-move rule (no capture and no pawn move in 60 moves).";
+            return true;
+        }
+
+        // -------- 5) Default: not a draw --------
+        reason = string.Empty;
+        return false;
+    }
 
     /// <summary>
     /// initialize board with pieces with initial position
@@ -366,5 +419,88 @@ public class Board
         player.AddPiece(row, col, piece);
     }
 
-}
+    private Dictionary<PieceType, int> CountPieces(Player player)
+    {
+        var counts = new Dictionary<PieceType, int>();
+        foreach (var kvp in player.Pieces)
+        {
+            var p = kvp.Value;
+            if (p.Type == PieceType.None) continue;
+            if (!counts.ContainsKey(p.Type)) counts[p.Type] = 0;
+            counts[p.Type]++;
+        }
+        return counts;
+    }
 
+    // Helper predicates for draw detection
+    private bool OnlyKing(IDictionary<PieceType, int> c)
+    {
+        return c.Get(PieceType.General) == 1 && c.SumExcept(PieceType.General) == 0;
+    }
+
+
+    private bool OnlyKingShiXiang(IDictionary<PieceType, int> c)
+    {
+        return c.Get(PieceType.General) == 1 &&
+            c.SumExcept(PieceType.General, PieceType.Advisor, PieceType.Elephant) == 0;
+    }
+
+    private bool IsTheoreticalDraw(out string why)
+    {
+        // Gather piece counts for both sides.
+        var redCounts = CountPieces(PlayerRed);
+        var blackCounts = CountPieces(PlayerBlack);
+
+        // 1) King vs King
+        if (OnlyKing(redCounts) && OnlyKing(blackCounts))
+        {
+            why = "Theoretical draw: king vs king.";
+            return true;
+        }
+
+        // 2) King+(shi/xiang only) vs King+(shi/xiang only)
+        if (OnlyKingShiXiang(redCounts) && OnlyKingShiXiang(blackCounts))
+        {
+            why = "Theoretical draw: both sides have only king with advisors/elephants.";
+            return true;
+        }
+
+        // 3) Single cannon edge case: if across the entire board there is at most one cannon
+        //    and no rooks/horses/pawns remain, neither side can realistically mate.
+        int totalCannons = redCounts.Get(PieceType.Cannon) + blackCounts.Get(PieceType.Cannon);
+        bool noHeavyOrPawns =
+            redCounts.Get(PieceType.Chariot) + blackCounts.Get(PieceType.Chariot) == 0 &&
+            redCounts.Get(PieceType.Horse) + blackCounts.Get(PieceType.Horse) == 0 &&
+            redCounts.Get(PieceType.Soldier) + blackCounts.Get(PieceType.Soldier) == 0;
+
+        if (totalCannons <= 1 && noHeavyOrPawns)
+        {
+            why = "Theoretical draw: no mating material (no rooks/horses/pawns and ≤1 cannon).";
+            return true;
+        }
+
+        // 4) One side has only king+(shi/xiang only), the other has only king+cannon (no other pieces).
+        //    Without a screen piece, cannon cannot force mate against a fortified palace.
+        bool sideA_KingShiXiangOnly = OnlyKingShiXiang(redCounts);
+        bool sideB_OnlyKingAndOneCannon = blackCounts.Get(PieceType.General) == 1 &&
+                                        blackCounts.Get(PieceType.Cannon) == 1 &&
+                                        blackCounts.SumExcept(PieceType.General, PieceType.Cannon) == 0;
+        bool sideB_KingShiXiangOnly = OnlyKingShiXiang(blackCounts);
+        bool sideA_OnlyKingAndOneCannon = redCounts.Get(PieceType.General) == 1 &&
+                                        redCounts.Get(PieceType.Cannon) == 1 &&
+                                        redCounts.SumExcept(PieceType.General, PieceType.Cannon) == 0;
+
+        if ((sideA_KingShiXiangOnly && sideB_OnlyKingAndOneCannon) ||
+            (sideB_KingShiXiangOnly && sideA_OnlyKingAndOneCannon))
+        {
+            // Double-check there is no screen piece on board at all (already implied by counts above).
+            why = "Theoretical draw: cannon without screen vs king with advisors/elephants.";
+            return true;
+        }
+
+        // Otherwise, assume mating chances still exist.
+        why = string.Empty;
+        return false;
+    }
+
+}
