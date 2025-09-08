@@ -20,19 +20,52 @@ public class Board
     }
 
     /// <summary>
-    /// initialize the board with Empty piece type
-    /// called by constructor by default
+    /// not used yet!!!!!!!!!!!!!!!!!!
     /// </summary>
-    private void InitializeEmptyBoard()
+    /// <returns></returns>
+    public bool IsGameOver()
     {
-        for (int r = 0; r < Rows; r++)
+        // If the current player is in check and has no legal moves to escape it, they are checkmated.
+        if (IsInCheck(CurrentPlayer) && !HasAnyLegalMoves(CurrentPlayer))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// not used yet!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    /// </summary>
+    /// <param name="player"></param>
+    /// <returns></returns>
+    public bool IsInCheck(Player player)
+    {
+        Player opponent = player == PlayerRed ? PlayerBlack : PlayerRed;
+
+        // Find the general's position
+        var generalPos = player.FindGeneral();
+        if (generalPos == null)
+            return false; // Should not happen in a normal game
+
+        int genRow = generalPos.Value.row;
+        int genCol = generalPos.Value.col;
+
+        // Check if any opponent piece can capture the general
+        foreach (var kvp in opponent.Pieces)
         {
-            for (int c = 0; c < Columns; c++)
+            var (opRow, opCol) = kvp.Key;
+            var piece = kvp.Value;
+
+            if (CanMove(opRow, opCol, genRow, genCol))
             {
-                Grid[r, c] = Piece.Empty; // Shared empty piece instance
+                return true;
             }
         }
+
+        return false;
     }
+
+
+
 
     /// <summary>
     /// initialize board with pieces with initial position
@@ -76,24 +109,18 @@ public class Board
         }
     }
 
-    private void PlacePiece(int row, int col, PieceType type, Player player)
-    {
-        var piece = new Piece(player, type);
-        Grid[row, col] = piece;
-        player.AddPiece(row, col, piece);
-    }
 
+    /// <summary>
+    /// moving a piece from source cordinate to destination cordinate, have to use validation method before calling this method, valiadation method is CanMove
+    /// </summary>
+    /// <param name="fromRow">source row number</param>
+    /// <param name="fromCol">source column number</param>
+    /// <param name="toRow">destination row number</param>
+    /// <param name="toCol">destination column number</param>
+    /// <returns></returns>
     public bool MovePiece(int fromRow, int fromCol, int toRow, int toCol)
     {
-        // Validate bounds
-        if (!IsWithinBounds(fromRow, fromCol) || !IsWithinBounds(toRow, toCol))
-            return false;
-
         Piece movingPiece = Grid[fromRow, fromCol];
-
-        // Check if there is a piece to move
-        if (movingPiece == null || movingPiece.Type == PieceType.None)
-            return false;
 
         // Identify source and destination players
         Player currentPlayer = movingPiece.Owner == PlayerRed ? PlayerRed : PlayerBlack;
@@ -116,63 +143,34 @@ public class Board
         return true;
     }
 
-    private bool IsWithinBounds(int row, int col)
-    {
-        return row >= 0 && row < Rows && col >= 0 && col < Columns;
-    }
 
-    public bool IsGameOver()
-    {
-        // If the current player is in check and has no legal moves to escape it, they are checkmated.
-        if (IsInCheck(CurrentPlayer) && !HasAnyLegalMoves(CurrentPlayer))
-            return true;
-
-        return false;
-    }
-
-    public bool IsInCheck(Player player)
-    {
-        Player opponent = player == PlayerRed ? PlayerBlack : PlayerRed;
-
-        // Find the general's position
-        var generalPos = player.FindGeneral();
-        if (generalPos == null)
-            return false; // Should not happen in a normal game
-
-        int genRow = generalPos.Value.row;
-        int genCol = generalPos.Value.col;
-
-        // Check if any opponent piece can capture the general
-        foreach (var kvp in opponent.Pieces)
-        {
-            var (opRow, opCol) = kvp.Key;
-            var piece = kvp.Value;
-
-            if (CanMove(opRow, opCol, genRow, genCol))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
+    /// <summary>
+    /// check if the piece is allowed to move by rule, Chinese chess rule is applied in this method
+    /// </summary>
+    /// <param name="fromRow">piece source row number</param>
+    /// <param name="fromCol">piece source column number</param>
+    /// <param name="toRow">piece destination column number</param>
+    /// <param name="toCol">piece destination column number</param>
+    /// <returns>true when the move is allowed</returns>
     public bool CanMove(int fromRow, int fromCol, int toRow, int toCol)
     {
+        // 1. Validate bounds
+        if (!IsWithinBounds(fromRow, fromCol) || !IsWithinBounds(toRow, toCol))
+            return false;
 
         Piece piece = Grid[fromRow, fromCol];
 
-        // Can't move to the same square
-        if (fromRow == toRow && fromCol == toCol)
+        // 2. Check if there is a piece to move
+        if (piece == null || piece.Type == PieceType.None)
             return false;
 
-        // Check bounds
-        if (!IsWithinBounds(toRow, toCol))
+        // 3. Can't move to the same square
+        if (fromRow == toRow && fromCol == toCol)
             return false;
 
         Piece target = Grid[toRow, toCol];
 
-        // Cannot move to a position occupied by own piece
+        // 4. Cannot move to a position occupied by own piece
         if (target.Type != PieceType.None && target.Owner == piece.Owner)
             return false;
 
@@ -183,6 +181,7 @@ public class Board
 
         bool isCapture = target.Type != PieceType.None && target.Owner != piece.Owner;
 
+        // 5. Specific piece rule by Chinese Chess
         switch (piece.Type)
         {
             case PieceType.General:
@@ -291,7 +290,26 @@ public class Board
         return false;
     }
 
-    public bool HasAnyLegalMoves(Player player)
+    /// <summary>
+    /// reassign current player variable to other player
+    /// </summary>
+    public void SwitchPlayer()
+    {
+        CurrentPlayer = CurrentPlayer == PlayerRed ? PlayerBlack : PlayerRed;
+    }
+
+    private void InitializeEmptyBoard()
+    {
+        for (int r = 0; r < Rows; r++)
+        {
+            for (int c = 0; c < Columns; c++)
+            {
+                Grid[r, c] = Piece.Empty; // Shared empty piece instance
+            }
+        }
+    }
+
+    private bool HasAnyLegalMoves(Player player)
     {
         foreach (var fromKvp in player.Pieces)
         {
@@ -336,12 +354,17 @@ public class Board
         return false;
     }
 
-
-    public void SwitchPlayer()
+    private bool IsWithinBounds(int row, int col)
     {
-        CurrentPlayer = CurrentPlayer == PlayerRed ? PlayerBlack : PlayerRed;
+        return row >= 0 && row < Rows && col >= 0 && col < Columns;
     }
 
+    private void PlacePiece(int row, int col, PieceType type, Player player)
+    {
+        var piece = new Piece(player, type);
+        Grid[row, col] = piece;
+        player.AddPiece(row, col, piece);
+    }
 
 }
 
