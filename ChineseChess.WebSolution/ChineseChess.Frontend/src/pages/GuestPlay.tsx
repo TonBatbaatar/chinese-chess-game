@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
-// If you already have a factory in src/lib/signalr.ts, use that instead:
-// import { createConnection } from "../lib/signalr";
+import { useAuth } from "../context/AuthContext";
+
 
 type Cell = { r: number; c: number; type: string; owner: string };
 type BoardDto = { rows: number; cols: number; cells: Cell[]; currentPlayer: string };
+// type CreateGameResult = { gameId: string; currentTurn: string; board: BoardDto; seat: string }; // your hub DTO
+// type JoinResult = { ok: boolean; error?: string; board?: BoardDto; seat?: string | null };
 
 export default function GuestPlay() {
   const [gameId, setGameId] = useState<string>("");
@@ -17,9 +19,20 @@ export default function GuestPlay() {
 
   const connRef = useRef<HubConnection | null>(null);
 
+  //inside component:
+  const { user, displayName, becomeGuest} = useAuth();
+
+  // const [seat, setSeat] = useState<string | null>(null); // "Red" | "Black" | null
+  const [redPlayer, setRedPlayer] = useState<string>("Waiting…");
+  const [blackPlayer, setBlackPlayer] = useState<string>("Waiting…");
+
+  // ensure always have an identity on this page
   useEffect(() => {
-    // Use Vite proxy (recommended in dev): withUrl('/hub/game')
-    // Or use absolute URL if not proxying: withUrl('http://localhost:5000/hub/game')
+    if (!user) becomeGuest();
+  }, [user, becomeGuest]);
+
+  useEffect(() => {
+
     const conn = new HubConnectionBuilder()
       .withUrl("/hub/game")
       .withAutomaticReconnect()
@@ -30,7 +43,18 @@ export default function GuestPlay() {
     // server → client messages
     conn.on("State", (boardDto: BoardDto) => setBoard(boardDto));
     conn.on("MoveMade", (_move: any, boardDto: BoardDto) => setBoard(boardDto));
-    conn.on("Joined", (_connId: string) => { /* optional */ });
+    conn.on("Joined", (_connId: string, redEmail: string, blackEmail: string) => { 
+      setBlackPlayer(blackEmail ?? "Unknown player");
+      setRedPlayer(redEmail ?? "Unknown player");
+    });
+
+    // // Optional: if your server emits seat changes like ("SeatChanged", { red, black })
+    // conn.on("SeatChanged", (payload: { red?: string; black?: string }) => {
+    //   if (payload.red) setRedLabel(payload.red);
+    //   if (payload.black) setBlackLabel(payload.black);
+    // });
+
+    
 
     conn
       .start()
@@ -42,13 +66,30 @@ export default function GuestPlay() {
     };
   }, []);
 
+  // Helper to set labels when we know our seat
+  // function applySeatLabels(mySeat: string | null) {
+  //   if (!mySeat) return;
+  //   setSeat(mySeat);
+  //   if (mySeat === "Red") {
+  //     setRedLabel(userLabel);
+  //     if (blackLabel === "Waiting…") setBlackLabel("Opponent");
+  //   } else if (mySeat === "Black") {
+  //     setBlackLabel(userLabel);
+  //     if (redLabel === "Waiting…") setRedLabel("Opponent");
+  //   }
+  // }
+
   async function createGame() {
     setError(null);
     if (!connRef.current) return;
     try {
-      const result = await connRef.current.invoke<{ gameId: string; board: BoardDto }>("CreateGame");
+      // Guid GameId, string CurrentTurn, object Board, string Seat
+      const result = await connRef.current.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame");
       setGameId(result.gameId);
       setBoard(result.board);
+
+      setRedPlayer(user?.email ?? "no user logged in");
+
     } catch (e) {
       setError(String(e));
     }
@@ -57,6 +98,7 @@ export default function GuestPlay() {
   async function joinGame() {
     setError(null);
     if (!connRef.current || !joinedId) return;
+    
     try {
       const ok = await connRef.current.invoke<boolean>("JoinGame", joinedId.trim());
       if (ok) setGameId(joinedId.trim());
@@ -87,7 +129,14 @@ export default function GuestPlay() {
       <div className="max-w-5xl mx-auto space-y-6">
         <header className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Chinese Chess — Guest Play</h1>
+            <h1 className="text-2xl font-bold">
+              {/*Null-safe*/}
+              {user?.isGuest
+                ? "Chinese Chess — Guest Play"
+                : displayName
+                  ? `Hello, ${displayName}`
+                  : "Chinese Chess"}
+            </h1>
             <p className="text-sm text-gray-600">Status: {status}</p>
           </div>
           {board && (
@@ -172,8 +221,8 @@ export default function GuestPlay() {
           <aside className="w-full max-w-sm rounded-lg bg-white p-4 shadow border">
             <h3 className="font-semibold mb-2">Legend</h3>
             <ul className="text-sm text-gray-700 space-y-1">
-              <li><span className="font-semibold text-red-600">Red</span> pieces</li>
-              <li><span className="font-semibold text-gray-900">Black</span> pieces</li>
+              <li><span className="font-semibold text-red-600">Red</span> pieces = {redPlayer}</li>
+              <li><span className="font-semibold text-gray-900">Black</span> pieces = {blackPlayer}</li>
               <li><span className="text-gray-500">Dot</span> = empty cell</li>
               <li>River line between rows 5 and 6</li>
             </ul>

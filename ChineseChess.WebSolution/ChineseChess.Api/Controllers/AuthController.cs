@@ -46,7 +46,11 @@ public class AuthController : ControllerBase
         var result = await _signIn.PasswordSignInAsync(user, req.Password, isPersistent: true, lockoutOnFailure: false);
         if (!result.Succeeded) return Unauthorized("Invalid credentials.");
 
-        return Ok(new { ok = true });
+        return Ok(new
+        {
+            id = user.Id,
+            email = user.Email
+        });
     }
 
     [HttpPost("logout")]

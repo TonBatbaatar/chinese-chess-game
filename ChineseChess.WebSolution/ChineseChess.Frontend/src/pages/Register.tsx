@@ -13,6 +13,8 @@ export default function Register() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null); setErr(null);
+
+    // empty submission validation
     if (!email || !password) { setErr("Email and password required."); return; }
 
     try {
@@ -29,7 +31,7 @@ export default function Register() {
       }
       setMsg("Registered! You can login now.");
 
-      navigate('/guest'); // or `/home` later
+      navigate('/home');
 
     } catch (e) {
       setErr(String(e));

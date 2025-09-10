@@ -15,6 +15,10 @@ public class GameSession
     public string? RedUserId { get; set; }
     public string? BlackUserId { get; set; }
 
+    // both player email for legend update
+    public string? RedEmail { get; set; }
+    public string? BlackEmail { get; set; }
+
     public List<string> Moves { get; } = new(); // store simple text like "A3-B3" for now
 
     public GameSession(Board board) => Board = board;

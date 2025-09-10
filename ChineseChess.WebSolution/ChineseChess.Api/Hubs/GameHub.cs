@@ -17,6 +17,7 @@ public class GameHub : Hub
     public GameHub(IGameStore store) => _store = store;
 
     private string? UserId => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    private string? UserEmail => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
 
     // Create a new local game and auto-join caller to its room
     public async Task<CreateGameResult> CreateGame()
@@ -29,6 +30,8 @@ public class GameHub : Hub
         // Creator becomes Red by default (connection-based)
         session.RedConnectionId = Context.ConnectionId;
         session.RedUserId ??= UserId;
+
+        session.RedEmail = UserEmail;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
 
@@ -54,11 +57,14 @@ public class GameHub : Hub
             session.BlackUserId ??= UserId;
         }
 
+        session.BlackEmail = UserEmail;
+
         // Send current state to the client who just joined
         var boardDto = BoardMapper.ToDto(session.Board);
         await Clients.Caller.SendAsync("State", boardDto);
+
         // Notify room someone joined
-        await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId);
+        await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.RedEmail, session.BlackEmail);
         return true;
     }
 
