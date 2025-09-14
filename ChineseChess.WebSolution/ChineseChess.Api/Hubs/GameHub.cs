@@ -6,6 +6,7 @@ using ChineseChess.Api.Game;
 using ChineseChess.Api.Mapping;
 using ChineseChess.Api.Contracts;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 
 namespace ChineseChess.Api;
 
@@ -13,6 +14,7 @@ public class GameHub : Hub
 {
 
     private readonly IGameStore _store;
+    private static readonly ConcurrentDictionary<string, PlayerPresence> _connections = new();
 
     public GameHub(IGameStore store) => _store = store;
 
@@ -33,6 +35,16 @@ public class GameHub : Hub
 
         session.RedEmail = UserEmail;
 
+        // add to connected user dic
+        var presence = new PlayerPresence
+        {
+            ConnectionId = Context.ConnectionId,
+            GameId = room,
+            UserId = UserEmail,
+            Color = "Red"
+        };
+        _connections[Context.ConnectionId] = presence;
+        // add to async group
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
 
         // send initial board state only to the creator
@@ -41,6 +53,7 @@ public class GameHub : Hub
         return new CreateGameResult(session.Id, session.Board.CurrentPlayer.Color.ToString(), boardDto, "Red");
     }
 
+
     // Join existing game by id (room)
     public async Task<bool> JoinGame(string gameId)
     {
@@ -48,6 +61,16 @@ public class GameHub : Hub
         var session = _store.Get(id);
         if (session is null) return false;
 
+        // add to connected user dic
+        var presence = new PlayerPresence
+        {
+            ConnectionId = Context.ConnectionId,
+            GameId = gameId,
+            UserId = UserEmail,
+            Color = "Black"
+        };
+        _connections[Context.ConnectionId] = presence;
+        // add to async group
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
 
         // Auto-assign Black if free, otherwise leave as spectator
@@ -67,6 +90,7 @@ public class GameHub : Hub
         await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.RedEmail, session.BlackEmail);
         return true;
     }
+
 
     // Make a move: server validates via engine and broadcasts updated state if valid
     public async Task<MoveResponse> MakeMove(string gameId, string from, string to)
@@ -88,7 +112,6 @@ public class GameHub : Hub
 
         var expectedSeat = board.CurrentPlayer.Color.ToString(); // "Red" or "Black"
 
-
         // 1) Seat must match current turn
         if (!string.Equals(callerSeat, expectedSeat, StringComparison.OrdinalIgnoreCase))
             return new MoveResponse(false, "Not your turn.", BoardMapper.ToDto(board));
@@ -107,13 +130,11 @@ public class GameHub : Hub
         if (!_store.TryApplyMove(id, from, to, out var error))
             return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
 
-
-
-
         // Broadcast new state
         await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
         return new MoveResponse(true, null, BoardMapper.ToDto(board));
     }
+
 
     // Let a client ask for the latest state explicitly
     public async Task<bool> RequestState(string gameId)
@@ -124,5 +145,24 @@ public class GameHub : Hub
         await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board));
         return true;
     }
+
+    /// <summary>
+    /// this methond will called when one clinet disconnected
+    /// </summary>
+    /// <param name="ex"></param>
+    /// <returns></returns>
+    public override async Task OnDisconnectedAsync(Exception? ex)
+    {
+        if (_connections.TryRemove(Context.ConnectionId, out var presence))
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, presence.GameId);
+
+            // notify the remaining player(s)
+            await Clients.Group(presence.GameId).SendAsync("PlayerDisconnected", presence.UserId, presence.Color, ex?.Message ?? "closed");
+        }
+
+        await base.OnDisconnectedAsync(ex);
+    }
+
 }
 
