@@ -1,19 +1,47 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks.Dataflow;
 
 namespace ChineseChess.Engine;
 
 public class Player
 {
     public Color Color { get; set; }
+    public string? PlayerID { get; set; }
+    public string? PlayerConnectionID { get; set; }
+    public string? PlayerEmail { get; set; }
+    public bool IsMyTurn { get; set; }
+
+    // For the disconnect grace window
+    public CancellationTokenSource? ForfeitCts { get; set; }
+    public DateTimeOffset? DisconnectDeadlineUtc { get; set; }
+    public bool IsConnected { get; set; }
 
     // Key = position, Value = piece at that position
     public Dictionary<(int row, int col), Piece> Pieces { get; private set; }
 
-    public Player(Color color)
+    // constructor
+    public Player(Color color, bool isMyTurn)
     {
         Color = color;
+        this.IsMyTurn = isMyTurn;
         Pieces = new Dictionary<(int row, int col), Piece>();
+    }
+
+    /// <summary>
+    /// switch the player turn
+    /// </summary>
+    public void switchTurn()
+    {
+        if (IsMyTurn == true)
+        {
+            IsMyTurn = false;
+        }
+        else
+        {
+            IsMyTurn = true;
+        }
+
     }
 
     public void AddPiece(int row, int col, Piece piece)

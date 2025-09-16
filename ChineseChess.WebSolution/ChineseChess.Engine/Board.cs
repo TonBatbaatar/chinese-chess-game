@@ -12,8 +12,8 @@ public class Board
     public Board()
     {
         Grid = new Piece[Rows, Columns];
-        PlayerRed = new Player(Color.Red);
-        PlayerBlack = new Player(Color.Black);
+        PlayerRed = new Player(Color.Red, true);
+        PlayerBlack = new Player(Color.Black, false);
         CurrentPlayer = PlayerRed;
 
         InitializeEmptyBoard();
@@ -30,6 +30,24 @@ public class Board
             return true;
 
         return false;
+    }
+
+
+    /// <summary>
+    /// get player by its conneciton ID
+    /// </summary>
+    /// <param name="connectionID"> the key to find the player in this board</param>
+    /// <returns>return the player object from the board</returns>
+    public Player GetPlayerByID(string connectionID)
+    {
+        if (PlayerRed.PlayerConnectionID == connectionID) return PlayerRed;
+        else return PlayerBlack;
+    }
+
+    public Player GetOppnentPlayer(string connectionID)
+    {
+        if (PlayerRed.PlayerConnectionID == connectionID) return PlayerBlack;
+        else return PlayerRed;
     }
 
     /// <summary>
@@ -123,7 +141,7 @@ public class Board
     /// <summary>
     /// initialize board with pieces with initial position
     /// </summary>
-    public void InitializeLocalBoard()
+    public void InitializeBoard()
     {
         // Red bottom side (rows 7–9)
         PlacePiece(9, 4, PieceType.General, PlayerRed);
@@ -349,6 +367,8 @@ public class Board
     public void SwitchPlayer()
     {
         CurrentPlayer = CurrentPlayer == PlayerRed ? PlayerBlack : PlayerRed;
+        PlayerRed.switchTurn();
+        PlayerBlack.switchTurn();
     }
 
     private void InitializeEmptyBoard()

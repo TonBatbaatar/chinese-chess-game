@@ -21,10 +21,11 @@ public class PersistentGameStore : IGameStore
         _cache = cache;
     }
 
-    public GameSession CreateLocal(string? creatorUserId = null)
+
+    public GameSession CreateGame(string? creatorUserId = null)
     {
         var board = new Board();
-        board.InitializeLocalBoard();
+        board.InitializeBoard();
 
         var session = new GameSession(board);
         var id = session.Id;
@@ -49,6 +50,8 @@ public class PersistentGameStore : IGameStore
         return session;
     }
 
+
+
     public GameSession? Get(Guid id)
     {
         if (_cache.TryGet(id, out var cached))
@@ -66,6 +69,38 @@ public class PersistentGameStore : IGameStore
         _cache.Set(session);
         return session;
     }
+
+
+    public bool EndWithWinner(Guid id, Player winner, out string? error)
+    {
+
+        error = null;
+
+        var session = Get(id);
+        if (session is null)
+        {
+            error = "Game not found.";
+            return false;
+        }
+
+        // get game record
+        var rec = _db.Games.FirstOrDefault(g => g.Id == id);
+        if (rec is null)
+        {
+            error = "Game record missing.";
+            return false;
+        }
+
+        // Save snapshot
+        rec.StateJson = _ser.ToJson(session.Board);
+        rec.UpdatedAtUtc = DateTime.UtcNow;
+        rec.IsFinished = true;
+
+        _db.SaveChanges();
+        return true;
+    }
+
+
 
     public bool TryApplyMove(Guid id, string from, string to, out string? error)
     {

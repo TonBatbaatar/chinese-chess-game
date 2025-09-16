@@ -19,10 +19,10 @@ public class GamesController : ControllerBase
     public ActionResult<CreateGameResult> Create()
     {
         var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var session = _store.CreateLocal(userId);
+        var session = _store.CreateGame(userId);
 
         // Assign creator as Red (connection-based seat happens in Hub, but here we mimic it)
-        session.RedUserId = userId;
+        session.Board.PlayerRed.PlayerConnectionID = userId;
 
         var boardDto = BoardMapper.ToDto(session.Board);
 

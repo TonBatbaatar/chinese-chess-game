@@ -5,10 +5,9 @@ import { useAuth } from "../context/AuthContext";
 
 type Cell = { r: number; c: number; type: string; owner: string };
 type BoardDto = { rows: number; cols: number; cells: Cell[]; currentPlayer: string };
-// type CreateGameResult = { gameId: string; currentTurn: string; board: BoardDto; seat: string }; // your hub DTO
-// type JoinResult = { ok: boolean; error?: string; board?: BoardDto; seat?: string | null };
 
 export default function GuestPlay() {
+    
     const [gameId, setGameId] = useState<string>("");
     const [joinedId, setJoinedId] = useState<string>("");
     const [board, setBoard] = useState<BoardDto | null>(null);
@@ -30,8 +29,8 @@ export default function GuestPlay() {
         if (!user) becomeGuest();
     }, [user, becomeGuest]);
     
+
     useEffect(() => {
-        
         const conn = new HubConnectionBuilder()
         .withUrl("/hub/game")
         .withAutomaticReconnect()
@@ -53,8 +52,10 @@ export default function GuestPlay() {
                 setBlackPlayer(`Player Black Disconnected, waiting ...`);
             }
         });
-        
-        
+        conn.on("MatchEnded", (winnerEmail: string, reason : string) => {
+            setStatus(`Player ${winnerEmail} won due to ${reason}`)
+        });
+            
         conn
         .start()
         .then(() => setStatus("connected"))
@@ -72,9 +73,9 @@ export default function GuestPlay() {
         try {
             // Guid GameId, string CurrentTurn, object Board, string Seat
             const result = await connRef.current.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame");
-            setGameId(result.gameId);
-            setBoard(result.board);
             
+            setGameId(result.gameId);
+            setBoard(result.board); 
             setRedPlayer(user?.email ?? "no user logged in");
             
         } catch (e) {
@@ -188,10 +189,10 @@ export default function GuestPlay() {
             
             {gameId && (
                 <div className="rounded-lg bg-white p-3 shadow border">
-                <div>
-                <span className="font-medium">Game ID:</span> <code>{gameId}</code>
-                </div>
-                <div className="text-sm text-gray-600">Share this ID with your opponent.</div>
+                    <div>
+                        <span className="font-medium">Game ID:</span> <code>{gameId}</code>
+                    </div>
+                    <div className="text-sm text-gray-600">Share this ID with your opponent.</div>
                 </div>
             )}
             
