@@ -7,7 +7,8 @@ using Microsoft.OpenApi.Models; //for swagger
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 // SQLLite database with EF
 builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=chinesechess.db"));

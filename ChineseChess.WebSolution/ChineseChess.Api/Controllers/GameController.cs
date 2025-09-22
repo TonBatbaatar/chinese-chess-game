@@ -10,9 +10,10 @@ namespace ChineseChess.Api.Controllers;
 [Route("api/[controller]")]
 public class GamesController : ControllerBase
 {
+    // singleton and constructor
     private readonly IGameStore _store;
-
     public GamesController(IGameStore store) => _store = store;
+
 
     // POST api/games
     [HttpPost]

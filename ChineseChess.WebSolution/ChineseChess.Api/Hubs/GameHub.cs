@@ -8,6 +8,7 @@ using ChineseChess.Api.Contracts;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
+using System.ComponentModel.Design.Serialization;
 
 namespace ChineseChess.Api;
 
@@ -15,12 +16,21 @@ public class GameHub : Hub
 {
 
     private readonly IGameStore _store;
-    public GameHub(IGameStore store) => _store = store;
+    private readonly ILogger<GameHub> _logger;
+    public GameHub(ILogger<GameHub> logger, IGameStore store)
+    {
+        _store = store;
+        _logger = logger;
+    }
 
 
     private static readonly ConcurrentDictionary<string, PlayerPresence> _connections = new();
     private string? UserId => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     private string? UserEmail => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+
+    // per-game lock to prevent race conditions
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
+    private SemaphoreSlim LockFor(Guid id) => _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
 
 
     /// <summary>
@@ -70,31 +80,84 @@ public class GameHub : Hub
         var session = _store.Get(id);
         if (session is null) return false;
 
-        // set black player as later joiner
-        session.Board.PlayerBlack.PlayerConnectionID = Context.ConnectionId;
-        session.Board.PlayerBlack.PlayerID = UserId;
-        session.Board.PlayerBlack.PlayerEmail = UserEmail;
-        session.Board.PlayerBlack.IsConnected = true;
-
-        // add to connected user dic
-        var presence = new PlayerPresence
+        var gate = LockFor(id);
+        await gate.WaitAsync();
+        try
         {
-            ConnectionId = Context.ConnectionId,
-            GameId = gameId,
-            UserId = UserEmail,
-            Color = "Black"
-        };
-        _connections[Context.ConnectionId] = presence;
-        // add to async group
-        await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+            Player? me =
+                (session.Board.PlayerRed.PlayerID == UserId) ? session.Board.PlayerRed :
+                (session.Board.PlayerBlack.PlayerID == UserId) ? session.Board.PlayerBlack : null;
 
-        // Send current state to the client who just joined
-        var boardDto = BoardMapper.ToDto(session.Board);
+            if (me != null)
+            {
+                var old = me.ForfeitCts;
+                me.ForfeitCts = null;
+                old?.Cancel();
+                old?.Dispose();
 
-        await Clients.Caller.SendAsync("State", boardDto);
+                me.IsConnected = true;
+                me.PlayerConnectionID = Context.ConnectionId;
 
-        // Notify room someone joined
-        await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerEmail, session.Board.PlayerBlack.PlayerEmail);
+                // add to connected user dic
+                _connections[Context.ConnectionId] = new PlayerPresence
+                {
+                    ConnectionId = Context.ConnectionId,
+                    GameId = gameId,
+                    UserId = UserEmail,
+                    Color = me.Color.ToString(),
+                };
+
+                await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+                await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), me.Color.ToString());
+                await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerEmail, session.Board.PlayerBlack.PlayerEmail);
+                // await Clients.Group(gameId).SendAsync("PlayerReconnected", UserId);
+                return true;
+            }
+
+            var joinColor = "";
+            if (session.Board.PlayerRed.PlayerID is null)
+            {
+                session.Board.PlayerRed.PlayerConnectionID = Context.ConnectionId;
+                session.Board.PlayerRed.PlayerID = UserId;
+                session.Board.PlayerRed.PlayerEmail = UserEmail;
+                session.Board.PlayerRed.IsConnected = true;
+                joinColor = "Red";
+            }
+            else if (session.Board.PlayerBlack.PlayerID is null)
+            {
+                session.Board.PlayerBlack.PlayerConnectionID = Context.ConnectionId;
+                session.Board.PlayerBlack.PlayerID = UserId;
+                session.Board.PlayerBlack.PlayerEmail = UserEmail;
+                session.Board.PlayerBlack.IsConnected = true;
+                joinColor = "Black";
+            }
+            else
+            {
+                // game is full : treat as spectator
+                await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+                await Clients.Caller.SendAsync("SpectatorJoined", BoardMapper.ToDto(session.Board), session.Board.PlayerRed.PlayerID, session.Board.PlayerBlack.PlayerID);
+                return true;
+            }
+
+            // add to connected user dic
+            var presence = new PlayerPresence
+            {
+                ConnectionId = Context.ConnectionId,
+                GameId = gameId,
+                UserId = UserEmail,
+                Color = joinColor
+            };
+            _connections[Context.ConnectionId] = presence;
+            await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+            await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), joinColor);
+            await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerEmail, session.Board.PlayerBlack.PlayerEmail);
+
+        }
+        finally
+        {
+            gate.Release();
+        }
+
         return true;
     }
 
@@ -151,7 +214,7 @@ public class GameHub : Hub
         if (!Guid.TryParse(gameId, out var id)) return false;
         var session = _store.Get(id);
         if (session is null) return false;
-        await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board));
+        await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), session.Board.GetPlayerByID(Context.ConnectionId).Color.ToString());
         return true;
     }
 
@@ -162,57 +225,56 @@ public class GameHub : Hub
     /// <returns></returns>
     public override async Task OnDisconnectedAsync(Exception? ex)
     {
-
-
         if (_connections.TryRemove(Context.ConnectionId, out var presence))
         {
+            if (!Guid.TryParse(presence.GameId, out var id))
+                return;
 
-            //get session by game room id
-            Guid.TryParse(presence.GameId, out var id);
-            var session = _store.Get(id);
-            if (session == null) throw new SessionNotFoundException(id);
-
-            // get board
+            var session = _store.Get(id) ?? throw new SessionNotFoundException(id);
             var board = session.Board;
-            var disconnectedPlaer = board.GetPlayerByID(Context.ConnectionId);
-            disconnectedPlaer.IsConnected = false;
 
-            // Don’t stack multiple timers
-            disconnectedPlaer.ForfeitCts?.Cancel();
-            disconnectedPlaer.ForfeitCts = new CancellationTokenSource();
+            var disconnected = board.GetPlayerByID(Context.ConnectionId);
+            if (disconnected == null) return;
 
-            disconnectedPlaer.DisconnectDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(10);
+            disconnected.IsConnected = false;
 
-            var oppnentPlayer = board.GetOppnentPlayer(Context.ConnectionId);
+            // cancel any prior timer and create a fresh CTS
+            disconnected.ForfeitCts?.Cancel();
+            disconnected.ForfeitCts = new CancellationTokenSource();
+            var token = disconnected.ForfeitCts.Token;
 
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10), disconnectedPlaer.ForfeitCts.Token);
+            disconnected.DisconnectDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(10);
 
-                    // After delay, if still disconnected and match not over -> forfeit
-                    if (!disconnectedPlaer.IsConnected && !board.IsGameOver())
-                    {
-
-                        _store.EndWithWinner(id, oppnentPlayer, out var error);
-
-                        // Notify opponent (and, if they reconnect later, show final state)
-                        await Clients.Group(presence.GameId).SendAsync("MatchEnded", new { winner = oppnentPlayer.PlayerEmail, reason = "opponent_disconnected" });
-                    }
-                }
-                catch (TaskCanceledException) { /* reconnect canceled the timer */ }
-            });
-
+            var opponent = board.GetOppnentPlayer(Context.ConnectionId);
 
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, presence.GameId);
+            await Clients.Group(presence.GameId)
+                .SendAsync("PlayerDisconnected", presence.UserId, presence.Color, ex?.Message ?? "closed");
 
-            // notify the remaining player(s)
-            await Clients.Group(presence.GameId).SendAsync("PlayerDisconnected", presence.UserId, presence.Color, ex?.Message ?? "closed");
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10), token);
+
+                if (!disconnected.IsConnected && !board.IsGameOver())
+                {
+                    _store.EndWithWinner(id, opponent, out var error);
+                    await Clients.Group(presence.GameId)
+                        .SendAsync("MatchEnded", opponent?.PlayerEmail, "opponent disconnected");
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                _logger.LogInformation("Forfeit timer canceled (player reconnected). Game {GameId}, Conn {ConnId}", id, Context.ConnectionId);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error while handling disconnect for Game {GameId}, Conn {ConnId}", id, Context.ConnectionId);
+            }
         }
 
         await base.OnDisconnectedAsync(ex);
     }
+
 
 }
 
