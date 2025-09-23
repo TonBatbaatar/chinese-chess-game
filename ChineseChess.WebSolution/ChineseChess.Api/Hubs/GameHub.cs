@@ -17,29 +17,42 @@ public class GameHub : Hub
 
     private readonly IGameStore _store;
     private readonly ILogger<GameHub> _logger;
-    public GameHub(ILogger<GameHub> logger, IGameStore store)
+    private readonly ClockService _clockService;
+    public GameHub(ILogger<GameHub> logger, IGameStore store, ClockService clockService)
     {
         _store = store;
         _logger = logger;
+        _clockService = clockService;
     }
 
 
     private static readonly ConcurrentDictionary<string, PlayerPresence> _connections = new();
-    private string? UserId => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    private string? UserId => Context.User?.Identity?.Name;
     private string? UserEmail => Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
 
     // per-game lock to prevent race conditions
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
     private SemaphoreSlim LockFor(Guid id) => _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
 
+    // clock broadcasters per game
+    private static readonly ConcurrentDictionary<string, Timer> _clockTimers = new();
+
 
     /// <summary>
     /// Create a new game and auto-join caller to its room
     /// </summary>
     /// <returns>GameID, currentTurn, BoardDTO, seat</returns>
-    public async Task<CreateGameResult> CreateGame()
+    public async Task<CreateGameResult> CreateGame(string timeControl)
     {
-        var session = _store.CreateGame(UserId);
+        var parts = timeControl.Split("|");
+        if (!int.TryParse(parts[0], out int initialMinutes) ||
+        !int.TryParse(parts[1], out int incrementSeconds))
+        {
+            throw new FormatException($"Invalid numbers in time control string: '{timeControl}'.");
+        }
+
+        var tc = new TimeControl(TimeSpan.FromMinutes(initialMinutes), TimeSpan.FromSeconds(incrementSeconds));
+        var session = _store.CreateGame(tc, UserId);
 
         string room = session.Id.ToString();
 
@@ -48,13 +61,15 @@ public class GameHub : Hub
         session.Board.PlayerRed.PlayerID = UserId;
         session.Board.PlayerRed.PlayerEmail = UserEmail;
         session.Board.PlayerRed.IsConnected = true;
+        session.Board.PlayerRed.RemainingTime = session.Clock.TimeControl.Initial;
 
         // add to connected user dic
         var presence = new PlayerPresence
         {
             ConnectionId = Context.ConnectionId,
             GameId = room,
-            UserId = UserEmail,
+            UserID = UserId,
+            UserEmail = UserEmail,
             Color = "Red"
         };
         _connections[Context.ConnectionId] = presence;
@@ -103,13 +118,14 @@ public class GameHub : Hub
                 {
                     ConnectionId = Context.ConnectionId,
                     GameId = gameId,
-                    UserId = UserEmail,
+                    UserID = UserId,
+                    UserEmail = UserEmail,
                     Color = me.Color.ToString(),
                 };
 
                 await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
                 await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), me.Color.ToString());
-                await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerEmail, session.Board.PlayerBlack.PlayerEmail);
+                await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerID, session.Board.PlayerBlack.PlayerID);
                 // await Clients.Group(gameId).SendAsync("PlayerReconnected", UserId);
                 return true;
             }
@@ -121,6 +137,7 @@ public class GameHub : Hub
                 session.Board.PlayerRed.PlayerID = UserId;
                 session.Board.PlayerRed.PlayerEmail = UserEmail;
                 session.Board.PlayerRed.IsConnected = true;
+                session.Board.PlayerRed.RemainingTime = session.Clock.TimeControl.Initial;
                 joinColor = "Red";
             }
             else if (session.Board.PlayerBlack.PlayerID is null)
@@ -129,6 +146,7 @@ public class GameHub : Hub
                 session.Board.PlayerBlack.PlayerID = UserId;
                 session.Board.PlayerBlack.PlayerEmail = UserEmail;
                 session.Board.PlayerBlack.IsConnected = true;
+                session.Board.PlayerBlack.RemainingTime = session.Clock.TimeControl.Initial;
                 joinColor = "Black";
             }
             else
@@ -144,13 +162,16 @@ public class GameHub : Hub
             {
                 ConnectionId = Context.ConnectionId,
                 GameId = gameId,
-                UserId = UserEmail,
+                UserID = UserId,
+                UserEmail = UserEmail,
                 Color = joinColor
             };
             _connections[Context.ConnectionId] = presence;
             await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+            session.Clock.Start(); //start the clock
+            _clockService.StartClockBroadcast(gameId, session); // start clock broadcaster
             await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), joinColor);
-            await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerEmail, session.Board.PlayerBlack.PlayerEmail);
+            await Clients.Group(gameId).SendAsync("Joined", Context.ConnectionId, session.Board.PlayerRed.PlayerID, session.Board.PlayerBlack.PlayerID);
 
         }
         finally
@@ -182,9 +203,19 @@ public class GameHub : Hub
         await gate.WaitAsync();
         try
         {
+            // Flagged validation
+            var flagged = session.Clock.GetFlaggedPlayer(session.Board);
+            var CurrentPlayer = board.GetPlayerByID(Context.ConnectionId);
+            Player opponent = CurrentPlayer == board.PlayerRed ? board.PlayerBlack : board.PlayerRed;
+            if (flagged != null)
+            {
+                await Clients.Group(gameId).SendAsync("MatchEnded", opponent.PlayerID, "opponent flagged!");
+                _clockService.StopClockBroadcast(gameId);
+                return new MoveResponse(false, "Game Ended.", BoardMapper.ToDto(board));
+            }
+
             // part 2: move validation
             // 2.1: Seat must match current turn
-            var CurrentPlayer = board.GetPlayerByID(Context.ConnectionId);
             if (!CurrentPlayer.IsMyTurn)
             {
                 return new MoveResponse(false, "Not your turn.", BoardMapper.ToDto(board));
@@ -192,6 +223,8 @@ public class GameHub : Hub
             // 2.2: Coordinate validation
             if (!Parser.TryParseCoordinate(from, out var fromPos))
                 return new MoveResponse(false, "Bad 'from' coordinate.", BoardMapper.ToDto(board));
+            if (!Parser.TryParseCoordinate(to, out var toPos))
+                return new MoveResponse(false, "Bad 'to' coordinate.", BoardMapper.ToDto(board));
 
             // 2.3: piece owner validation
             var movingPiece = board.Grid[fromPos.row, fromPos.col];
@@ -199,28 +232,42 @@ public class GameHub : Hub
             {
                 return new MoveResponse(false, "You can only move your own pieces.", BoardMapper.ToDto(board));
             }
-            // 2.4: Rule validation --> Delegate to store for full rules + persistence
+            // 2.4: Is under check validation
+            if (board.SimulateMove(fromPos.row, fromPos.col, toPos.row, toPos.col, out var sim))
+            {
+                bool inCheck = board.IsInCheck(CurrentPlayer);
+                board.RevertSim(sim);
+
+                if (inCheck)
+                    return new MoveResponse(false, "Move failed, you are under check.", BoardMapper.ToDto(board)); ;
+            }
+
+
+            // 2.5: Rule validation --> Delegate to store for full rules + persistence
             if (!_store.TryApplyMove(id, from, to, out var error))
                 return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
 
 
+            session.Clock.OnMoveCommitted(CurrentPlayer);
             // Broadcast new state
             await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
+
 
             // part 3: game over check
             // 3.1：validate draw rule
             if (board.IsDraw(out var reason))
             {
                 await Clients.Group(gameId).SendAsync("GameDraw", reason);
+                _clockService.StopClockBroadcast(gameId);
             }
 
 
             // 3.2: validate checkmate
-            Player opponent = CurrentPlayer == board.PlayerRed ? board.PlayerBlack : board.PlayerRed;
             if (board.IsGameOver(opponent))
             {
                 _store.EndWithWinner(id, CurrentPlayer, out var errorMessage);
                 await Clients.Group(gameId).SendAsync("MatchEnded", CurrentPlayer.PlayerID, "Checkmate!");
+                _clockService.StopClockBroadcast(gameId);
             }
 
             return new MoveResponse(true, null, BoardMapper.ToDto(board));
@@ -275,7 +322,7 @@ public class GameHub : Hub
 
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, presence.GameId);
             await Clients.Group(presence.GameId)
-                .SendAsync("PlayerDisconnected", presence.UserId, presence.Color, ex?.Message ?? "closed");
+                .SendAsync("PlayerDisconnected", presence.UserID, presence.Color, ex?.Message ?? "closed");
 
             try
             {
@@ -284,7 +331,7 @@ public class GameHub : Hub
                 if (!disconnected.IsConnected && !board.IsGameOver(disconnected) && !board.IsGameOver(opponent))
                 {
                     _store.EndWithWinner(id, opponent, out var error);
-                    await Clients.Group(presence.GameId).SendAsync("MatchEnded", opponent?.PlayerEmail, "opponent disconnected");
+                    await Clients.Group(presence.GameId).SendAsync("MatchEnded", opponent?.PlayerID, "opponent disconnected");
                 }
             }
             catch (TaskCanceledException)
@@ -299,7 +346,6 @@ public class GameHub : Hub
 
         await base.OnDisconnectedAsync(ex);
     }
-
 
 }
 

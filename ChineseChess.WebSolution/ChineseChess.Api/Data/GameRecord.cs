@@ -26,4 +26,7 @@ public class GameRecord
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public bool IsFinished { get; set; } = false;
+
+    public TimeSpan Initial { get; set; }
+    public TimeSpan Increment { get; set; }
 }

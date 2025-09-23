@@ -11,6 +11,7 @@ public class Player
     public string? PlayerConnectionID { get; set; }
     public string? PlayerEmail { get; set; }
     public bool IsMyTurn { get; set; }
+    public TimeSpan RemainingTime { get; set; }
 
     // For the disconnect grace window
     public CancellationTokenSource? ForfeitCts { get; set; }

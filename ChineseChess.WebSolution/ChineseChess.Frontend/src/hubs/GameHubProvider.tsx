@@ -10,7 +10,7 @@ type GameHubApi = {
     stop: () => Promise<void>;
     ensureStarted: () => Promise<void>;
     // hub methods
-    createGame: () => Promise<{ gameId: string, board: BoardDto }>;
+    createGame: (tc: string) => Promise<{ gameId: string, board: BoardDto }>;
     joinGame: (roomId: string) => Promise<boolean>;
     makeMove: (roomId: string, from: string, to: string) => Promise<{ ok: boolean; error?: string }>;
     // subscriptions
@@ -20,6 +20,7 @@ type GameHubApi = {
     onPlayerDisconnected: (h: (color: string) => void) => () => void;
     onMatchEnded: (h: (winnerEmail: string, reason: string) => void) => () => void;
     onSpectatorJoined : (h: (dto: BoardDto, redID: string, blackID : string) => void) => () => void;
+    onClockUpdate : (h: (redClock: string, blackClock : string) => void) => () => void;
     // ... add others as needed
 };
 
@@ -54,6 +55,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
             listenersRef.current.MatchEnded.forEach(h => h(winnerEmail, reason));
         });
         conn.on("SpectatorJoined", (dto: BoardDto, redID: string, blackID : string) => listenersRef.current.SpectatorJoined.forEach(h => h(dto, redID, blackID)));
+        conn.on("ClockUpdate", (redClock: string, blackClock : string) => listenersRef.current.ClockUpdate.forEach(h => h(redClock, blackClock)));
 
 
         connRef.current = conn;
@@ -66,6 +68,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         PlayerDisconnected: new Set<(color: string) => void>(),
         MatchEnded: new Set<(winnerEmail: string, reason: string) => void>(),
         SpectatorJoined: new Set<(dto: BoardDto, redID: string, blackID : string) => void>(),
+        ClockUpdate: new Set<(redClock: string, blackClock : string) => void>(),
     });
     
     const api: GameHubApi = useMemo(() => ({
@@ -85,9 +88,9 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ensureStarted: async () => {
             if (!ready) await api.start();
         },
-        createGame: async () => {
+        createGame: async (tc) => {
             await api.ensureStarted();
-            return connRef.current!.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame");
+            return connRef.current!.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame", tc);
         },
         joinGame: async (roomId) => {
             await api.ensureStarted();
@@ -120,6 +123,10 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         onSpectatorJoined: (h) => {
             listenersRef.current.SpectatorJoined.add(h);
             return () => listenersRef.current.SpectatorJoined.delete(h);
+        },
+        onClockUpdate: (h) => {
+            listenersRef.current.ClockUpdate.add(h);
+            return () => listenersRef.current.ClockUpdate.delete(h);
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [ready]);

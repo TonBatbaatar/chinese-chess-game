@@ -53,8 +53,8 @@ const AppRoutes: React.FC = () => {
                 element={
                     <HomePage
                     onCreateRoom={async (opts) => {
-                        const { gameId, board } = await createGame();
-                        navigate(`/room/${gameId}`, { state: { isCreator: true, tc: opts.timeControl, boardDto: board } }); // <-- tell MatchRoom you're the creator
+                        const { gameId, board } = await createGame(opts.timeControl);
+                        navigate(`/room/${gameId}`, { state: { isCreator: true, tc: opts.timeControl, boardDto: board } });
                     }}
                     onJoinRoom={async (code) => {
                         navigate(`/room/${code}`, { state: { isCreator: false, pendingJoin: true } });

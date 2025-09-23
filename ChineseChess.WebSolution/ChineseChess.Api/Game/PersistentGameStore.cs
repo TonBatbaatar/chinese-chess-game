@@ -22,12 +22,12 @@ public class PersistentGameStore : IGameStore
     }
 
 
-    public GameSession CreateGame(string? creatorUserId = null)
+    public GameSession CreateGame(TimeControl tc, string? creatorUserId = null)
     {
         var board = new Board();
         board.InitializeBoard();
 
-        var session = new GameSession(board);
+        var session = new GameSession(board, tc);
         var id = session.Id;
 
         // warm cache
@@ -41,7 +41,9 @@ public class PersistentGameStore : IGameStore
             CreatorUserId = creatorUserId, // may be null (guest)
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
-            IsFinished = false
+            IsFinished = false,
+            Initial = session.Clock.TimeControl.Initial,
+            Increment = session.Clock.TimeControl.Increment
         };
 
         _db.Games.Add(record);
@@ -61,7 +63,8 @@ public class PersistentGameStore : IGameStore
         if (rec is null) return null;
 
         var board = _ser.FromJson(rec.StateJson);
-        var session = new GameSession(board)
+        var tc = new TimeControl(rec.Initial, rec.Increment);
+        var session = new GameSession(board, tc)
         {
             // (optionally rehydrate seats from DB if later)
         };

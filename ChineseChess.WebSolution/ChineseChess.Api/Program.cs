@@ -27,6 +27,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 // cache services
 builder.Services.AddMemoryCache(); // IMemoryCache (singleton)
 builder.Services.AddSingleton<IGameSessionCache, InMemoryGameSessionCache>();
+builder.Services.AddSingleton<ClockService>();
 
 builder.Services.AddAuthentication(); // Identity already registers this
 builder.Services.AddAuthorization();

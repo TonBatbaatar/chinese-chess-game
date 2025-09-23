@@ -525,7 +525,7 @@ public class Board
     }
 
 
-    private sealed class Sim // record the exact changes to undo later
+    public sealed class Sim // record the exact changes to undo later
     {
         public required (int r, int c) From;
         public required (int r, int c) To;
@@ -534,7 +534,7 @@ public class Board
         public Player? CapturedOwner;
     }
 
-    private bool SimulateMove(int fromR, int fromC, int toR, int toC, out Sim sim)
+    public bool SimulateMove(int fromR, int fromC, int toR, int toC, out Sim sim)
     {
         sim = new Sim
         {
@@ -568,7 +568,7 @@ public class Board
         return true;
     }
 
-    private void RevertSim(Sim sim)
+    public void RevertSim(Sim sim)
     {
         var moved = sim.Moved;
 

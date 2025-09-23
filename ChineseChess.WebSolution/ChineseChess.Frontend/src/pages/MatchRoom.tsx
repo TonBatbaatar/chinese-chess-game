@@ -37,7 +37,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
     onResign,
     onBack,
 }) => {
-    const { onState, onMoveMade, makeMove, joinGame, onJoined, onPlayerDisconnected, onMatchEnded, onSpectatorJoined } = useGameHub(); // <-- reuse existing connection
+    const { onState, onMoveMade, makeMove, joinGame, onJoined, onPlayerDisconnected, onMatchEnded, onSpectatorJoined, onClockUpdate } = useGameHub(); // <-- reuse existing connection
     
     const [status, setStatus] = useState<string>(`Low-latency • ${timeControl}`);
     const [error, setError] = useState<string | null>(null);
@@ -52,6 +52,9 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
 
     const [myColor, setMyColor] = useState<"Red" | "Black">("Red");
     const [isSpectate, setIsSpectate] = useState<boolean>(false);
+
+    const [redTimer, setRedTimer] = useState<string>("10:00");
+    const [blackTimer, setBlackTimer] = useState<string>("10:00");
     
     
     // Subscribe to hub message listeners
@@ -87,6 +90,11 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
             setSelected(null); // ensure no highlight remains
             setIsSpectate(true);
         });
+
+        const offClockUpdate = onClockUpdate((redClock: string, blackClock: string) => {
+            setRedTimer(redClock);
+            setBlackTimer(blackClock);
+        });
         
         (async () => {
             if (pendingJoin) {
@@ -101,8 +109,9 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
             offPlayerDisconnected();
             offMatchEnded();
             offSpectatorJoined();
+            offClockUpdate;
         };
-    }, [roomId, onState, onMoveMade, onJoined, joinGame, onPlayerDisconnected, onMatchEnded, onSpectatorJoined]);
+    }, [roomId, onState, onMoveMade, onJoined, joinGame, onPlayerDisconnected, onMatchEnded, onSpectatorJoined, onClockUpdate]);
     
     
     // render board to creator for the first time
@@ -191,7 +200,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
             <PlayerCard
                 label="Black"
                 player={{ ...blackPlayerProp, name: blackName }}
-                timer={isSpectate ? undefined : "10:00"}
+                timer={isSpectate ? undefined : blackTimer}
                 active={sideToMove === "Black"}
             />
 
@@ -207,7 +216,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
             <PlayerCard
                 label="Red"
                 player={{ ...redPlayerProp, name: redName }}
-                timer={isSpectate ? undefined : "10:00"}
+                timer={isSpectate ? undefined : redTimer}
                 active={sideToMove === "Red"}
             />
         </motion.aside>
