@@ -71,6 +71,13 @@ public class PersistentGameStore : IGameStore
     }
 
 
+    /// <summary>
+    /// Store the game with end state to db
+    /// </summary>
+    /// <param name="id">game id</param>
+    /// <param name="winner">winner</param>
+    /// <param name="error"></param>
+    /// <returns></returns>
     public bool EndWithWinner(Guid id, Player winner, out string? error)
     {
 

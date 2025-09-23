@@ -178,33 +178,59 @@ public class GameHub : Hub
         if (board is null)
             return new MoveResponse(false, "Board not initialized.", null);
 
-
-        // part 2: move validation
-        // 2.1: Seat must match current turn
-        var CurrentPlayer = board.GetPlayerByID(Context.ConnectionId);
-        if (!CurrentPlayer.IsMyTurn)
+        var gate = LockFor(id);
+        await gate.WaitAsync();
+        try
         {
-            return new MoveResponse(false, "Not your turn.", BoardMapper.ToDto(board));
-        }
-        // 2.2: Coordinate validation
-        if (!Parser.TryParseCoordinate(from, out var fromPos))
-            return new MoveResponse(false, "Bad 'from' coordinate.", BoardMapper.ToDto(board));
+            // part 2: move validation
+            // 2.1: Seat must match current turn
+            var CurrentPlayer = board.GetPlayerByID(Context.ConnectionId);
+            if (!CurrentPlayer.IsMyTurn)
+            {
+                return new MoveResponse(false, "Not your turn.", BoardMapper.ToDto(board));
+            }
+            // 2.2: Coordinate validation
+            if (!Parser.TryParseCoordinate(from, out var fromPos))
+                return new MoveResponse(false, "Bad 'from' coordinate.", BoardMapper.ToDto(board));
 
-        // 2.3: piece owner validation
-        var movingPiece = board.Grid[fromPos.row, fromPos.col];
-        if (movingPiece.Owner != CurrentPlayer)
+            // 2.3: piece owner validation
+            var movingPiece = board.Grid[fromPos.row, fromPos.col];
+            if (movingPiece.Owner != CurrentPlayer)
+            {
+                return new MoveResponse(false, "You can only move your own pieces.", BoardMapper.ToDto(board));
+            }
+            // 2.4: Rule validation --> Delegate to store for full rules + persistence
+            if (!_store.TryApplyMove(id, from, to, out var error))
+                return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
+
+
+            // Broadcast new state
+            await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
+
+            // part 3: game over check
+            // 3.1：validate draw rule
+            if (board.IsDraw(out var reason))
+            {
+                await Clients.Group(gameId).SendAsync("GameDraw", reason);
+            }
+
+
+            // 3.2: validate checkmate
+            Player opponent = CurrentPlayer == board.PlayerRed ? board.PlayerBlack : board.PlayerRed;
+            if (board.IsGameOver(opponent))
+            {
+                _store.EndWithWinner(id, CurrentPlayer, out var errorMessage);
+                await Clients.Group(gameId).SendAsync("MatchEnded", CurrentPlayer.PlayerID, "Checkmate!");
+            }
+
+            return new MoveResponse(true, null, BoardMapper.ToDto(board));
+        }
+        finally
         {
-            return new MoveResponse(false, "You can only move your own pieces.", BoardMapper.ToDto(board));
+            gate.Release();
+
         }
-        // 2.4: Rule validation --> Delegate to store for full rules + persistence
-        if (!_store.TryApplyMove(id, from, to, out var error))
-            return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
 
-
-
-        // Broadcast new state
-        await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
-        return new MoveResponse(true, null, BoardMapper.ToDto(board));
     }
 
 
@@ -255,11 +281,10 @@ public class GameHub : Hub
             {
                 await Task.Delay(TimeSpan.FromSeconds(10), token);
 
-                if (!disconnected.IsConnected && !board.IsGameOver())
+                if (!disconnected.IsConnected && !board.IsGameOver(disconnected) && !board.IsGameOver(opponent))
                 {
                     _store.EndWithWinner(id, opponent, out var error);
-                    await Clients.Group(presence.GameId)
-                        .SendAsync("MatchEnded", opponent?.PlayerEmail, "opponent disconnected");
+                    await Clients.Group(presence.GameId).SendAsync("MatchEnded", opponent?.PlayerEmail, "opponent disconnected");
                 }
             }
             catch (TaskCanceledException)

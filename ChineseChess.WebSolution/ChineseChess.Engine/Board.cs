@@ -23,10 +23,11 @@ public class Board
     /// not used yet!!!!!!!!!!!!!!!!!!
     /// </summary>
     /// <returns></returns>
-    public bool IsGameOver()
+    public bool IsGameOver(Player player)
     {
+
         // If the current player is in check and has no legal moves to escape it, they are checkmated.
-        if (IsInCheck(CurrentPlayer) && !HasAnyLegalMoves(CurrentPlayer))
+        if (IsInCheck(player) && !HasAnyLegalMoves(player))
             return true;
 
         return false;
@@ -382,18 +383,25 @@ public class Board
         }
     }
 
-    private bool HasAnyLegalMoves(Player player)
+    public bool HasAnyLegalMoves(Player player)
     {
-        foreach (var fromKvp in player.Pieces)
+        // snapshot of the player’s pieces at their current squares
+        var fromEntries = player.Pieces.ToList(); // List<KeyValuePair<(int row,int col), Piece>>
+
+        foreach (var fromKvp in fromEntries)
         {
             var fromPos = fromKvp.Key;
             var piece = fromKvp.Value;
+
+            // The piece may have moved/captured since snapshot (in multithreaded cases),
+            // skip if it’s no longer there.
+            if (!ReferenceEquals(Grid[fromPos.row, fromPos.col], piece))
+                continue;
 
             for (int toR = 0; toR < Rows; toR++)
             {
                 for (int toC = 0; toC < Columns; toC++)
                 {
-                    if (!IsWithinBounds(toR, toC)) continue;
                     if ((fromPos.row == toR) && (fromPos.col == toC)) continue;
 
                     var targetPiece = Grid[toR, toC];
@@ -402,20 +410,13 @@ public class Board
                     if (targetPiece.Type != PieceType.None && targetPiece.Owner == player)
                         continue;
 
-                    if (CanMove(fromPos.row, fromPos.col, toR, toC))
+                    if (!CanMove(fromPos.row, fromPos.col, toR, toC))
+                        continue;
+
+                    if (SimulateMove(fromPos.row, fromPos.col, toR, toC, out var sim))
                     {
-                        // Simulate move
-                        var originalFrom = Grid[fromPos.row, fromPos.col];
-                        var originalTo = Grid[toR, toC];
-
-                        Grid[toR, toC] = originalFrom;
-                        Grid[fromPos.row, fromPos.col] = Piece.Empty;
-
                         bool inCheck = IsInCheck(player);
-
-                        // Undo move
-                        Grid[fromPos.row, fromPos.col] = originalFrom;
-                        Grid[toR, toC] = originalTo;
+                        RevertSim(sim);
 
                         if (!inCheck)
                             return true;
@@ -521,6 +522,71 @@ public class Board
         // Otherwise, assume mating chances still exist.
         why = string.Empty;
         return false;
+    }
+
+
+    private sealed class Sim // record the exact changes to undo later
+    {
+        public required (int r, int c) From;
+        public required (int r, int c) To;
+        public required Piece Moved;
+        public Piece? Captured;
+        public Player? CapturedOwner;
+    }
+
+    private bool SimulateMove(int fromR, int fromC, int toR, int toC, out Sim sim)
+    {
+        sim = new Sim
+        {
+            From = (fromR, fromC),
+            To = (toR, toC),
+            Moved = Grid[fromR, fromC],
+            Captured = Grid[toR, toC].Type == PieceType.None ? null : Grid[toR, toC],
+            CapturedOwner = Grid[toR, toC].Type == PieceType.None ? null : Grid[toR, toC].Owner
+        };
+
+        var moved = sim.Moved;
+        if (moved == null || moved.Type == PieceType.None)
+            return false;
+
+        // 1) Remove captured from board + opponent dictionary
+        if (sim.Captured != null && sim.CapturedOwner != null)
+        {
+            sim.CapturedOwner.Pieces.Remove((toR, toC));
+        }
+
+        // 2) Move the piece on the board
+        Grid[toR, toC] = moved;
+        Grid[fromR, fromC] = Piece.Empty; // however you represent empty
+
+        // 3) Update the mover’s dictionary key
+        if (moved.Owner == null) return false;
+        var owner = moved.Owner;
+        owner.Pieces.Remove((fromR, fromC));
+        owner.Pieces[(toR, toC)] = moved;
+
+        return true;
+    }
+
+    private void RevertSim(Sim sim)
+    {
+        var moved = sim.Moved;
+
+        // 1) Move the piece back on the board
+        Grid[sim.From.r, sim.From.c] = moved;
+        Grid[sim.To.r, sim.To.c] = sim.Captured ?? Piece.Empty;
+
+        // 2) Restore mover’s dictionary position
+        if (moved.Owner == null) return;
+        var owner = moved.Owner;
+        owner.Pieces.Remove(sim.To);
+        owner.Pieces[sim.From] = moved;
+
+        // 3) Restore captured piece (if any)
+        if (sim.Captured != null && sim.CapturedOwner != null)
+        {
+            sim.CapturedOwner.Pieces[sim.To] = sim.Captured;
+        }
     }
 
 }
