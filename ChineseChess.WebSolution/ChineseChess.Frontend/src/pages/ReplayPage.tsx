@@ -270,6 +270,7 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             <button onClick={onLast}  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-800">⏭</button>
             </div>
             {/* <div className="text-xs text-slate-400">Move {Math.min(ply + 1, viewer.moves.length)} / {viewer.moves.length}</div> */}
+            <div className="text-xs text-slate-400">Move {Math.min(ply + 1, 1)} / {1}</div> {/** error debugging code */}
             </div>
             </div>
             

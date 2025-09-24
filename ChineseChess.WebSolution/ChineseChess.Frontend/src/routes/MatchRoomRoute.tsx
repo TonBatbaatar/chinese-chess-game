@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation, useParams } from "react-router-dom";
 import MatchRoom from "../pages/MatchRoom"; // adjust path
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type Cell = { r: number; c: number; type: string; owner: "Red" | "Black" };
 type BoardDto = { rows: number; cols: number; cells: Cell[]; currentPlayer: "Red" | "Black" };
@@ -12,6 +13,7 @@ const MatchRoomRoute: React.FC = () => {
   const { id = "" } = useParams();
   const { state } = useLocation() as { state?: NavState };
   const { displayName } = useAuth();
+  const navigate = useNavigate();
 
   const isCreator = !!state?.isCreator;
   const pendingJoin = !!state?.pendingJoin;
@@ -30,12 +32,14 @@ const MatchRoomRoute: React.FC = () => {
   return (
     <MatchRoom
       roomId={id}
+      myName={displayName}
       isCreator={isCreator}          // optional hint for UI
       pendingJoin={pendingJoin}
       boardDto={boardDto}
       redPlayer={redPlayer}
       blackPlayer={blackPlayer}
       timeControl={timeControl}
+      onBack={() => {navigate("/home")}}
       // you can also pass getLegalMoves/onMove/onResign here if you like
     />
   );

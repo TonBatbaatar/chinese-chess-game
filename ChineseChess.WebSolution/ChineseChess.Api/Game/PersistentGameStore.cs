@@ -4,6 +4,7 @@ using System.Security.Claims;
 using ChineseChess.Api.Data;
 using ChineseChess.Engine;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Metadata;
 
 namespace ChineseChess.Api.Game;
 
@@ -217,6 +218,35 @@ public class PersistentGameStore : IGameStore
         {
             rec.Result = "0-1";
         }
+
+        _db.SaveChanges();
+        return true;
+    }
+
+    public bool GameDraw(Guid id, out string? error)
+    {
+        error = null;
+
+        var session = Get(id);
+        if (session is null)
+        {
+            error = "Game not found.";
+            return false;
+        }
+
+        // get game record
+        var rec = _db.Games.FirstOrDefault(g => g.Id == id);
+        if (rec is null)
+        {
+            error = "Game record missing.";
+            return false;
+        }
+
+        // Save snapshot
+        rec.StateJson = _ser.ToJson(session.Board);
+        rec.UpdatedAtUtc = DateTime.UtcNow;
+        rec.IsFinished = true;
+        rec.Result = "1/2-1/2";
 
         _db.SaveChanges();
         return true;

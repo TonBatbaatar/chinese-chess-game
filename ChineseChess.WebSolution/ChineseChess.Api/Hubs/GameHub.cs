@@ -185,7 +185,13 @@ public class GameHub : Hub
     }
 
 
-    // Make a move: server validates via engine and broadcasts updated state if valid
+    /// <summary>
+    /// Make a move: server validates via engine and broadcasts updated state if valid
+    /// </summary>
+    /// <param name="gameId"></param>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <returns></returns>
     public async Task<MoveResponse> MakeMove(string gameId, string from, string to)
     {
         // part 1: basic validation
@@ -227,7 +233,6 @@ public class GameHub : Hub
                 return new MoveResponse(false, "Bad 'from' coordinate.", BoardMapper.ToDto(board));
             if (!Parser.TryParseCoordinate(to, out var toPos))
                 return new MoveResponse(false, "Bad 'to' coordinate.", BoardMapper.ToDto(board));
-
             // 2.3: piece owner validation
             var movingPiece = board.Grid[fromPos.row, fromPos.col];
             if (movingPiece.Owner != CurrentPlayer)
@@ -243,8 +248,6 @@ public class GameHub : Hub
                 if (inCheck)
                     return new MoveResponse(false, "Move failed, you are under check.", BoardMapper.ToDto(board)); ;
             }
-
-
             // 2.5: Rule validation --> Delegate to store for full rules + persistence
             if (!_store.TryApplyMove(id, from, to, out var error))
                 return new MoveResponse(false, error ?? "Move rejected", BoardMapper.ToDto(board));
@@ -259,11 +262,10 @@ public class GameHub : Hub
             // 3.1：validate draw rule
             if (board.IsDraw(out var reason))
             {
+                _store.GameDraw(id, out error);
                 await Clients.Group(gameId).SendAsync("GameDraw", reason);
                 _clockService.StopClockBroadcast(gameId);
             }
-
-
             // 3.2: validate checkmate
             if (board.IsGameOver(opponent))
             {
@@ -277,13 +279,15 @@ public class GameHub : Hub
         finally
         {
             gate.Release();
-
         }
-
     }
 
 
-    // Let a client ask for the latest state explicitly
+    /// <summary>
+    /// Let a client ask for the latest state explicitly
+    /// </summary>
+    /// <param name="gameId"></param>
+    /// <returns></returns>
     public async Task<bool> RequestState(string gameId)
     {
         if (!Guid.TryParse(gameId, out var id)) return false;
@@ -292,6 +296,7 @@ public class GameHub : Hub
         await Clients.Caller.SendAsync("State", BoardMapper.ToDto(session.Board), session.Board.GetPlayerByID(Context.ConnectionId).Color.ToString());
         return true;
     }
+
 
     /// <summary>
     /// this methond will called when one clinet disconnected
@@ -334,6 +339,7 @@ public class GameHub : Hub
                 {
                     _store.EndWithWinner(id, opponent, out var error);
                     await Clients.Group(presence.GameId).SendAsync("MatchEnded", opponent?.PlayerID, "opponent disconnected");
+                    _clockService.StopClockBroadcast(presence.GameId);
                 }
             }
             catch (TaskCanceledException)
@@ -345,8 +351,83 @@ public class GameHub : Hub
                 _logger.LogError(e, "Error while handling disconnect for Game {GameId}, Conn {ConnId}", id, Context.ConnectionId);
             }
         }
-
         await base.OnDisconnectedAsync(ex);
+    }
+
+
+    public async Task SendChatMessage(string gameId, string text)
+    {
+        // game validation
+        if (!Guid.TryParse(gameId, out var id)) return;
+        var session = _store.Get(id);
+        if (session is null) return;
+
+        if (string.IsNullOrWhiteSpace(text)) return;
+        text = text.Trim();
+        if (text.Length > 2000) text = text.Substring(0, 2000);
+
+        // basic rate limiting
+        var key = Context.ConnectionId;
+        var now = DateTimeOffset.UtcNow;
+        string shortFmt = now.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var currentPlayer = session.Board.GetPlayerByID(Context.ConnectionId);
+
+        await Clients.Group(gameId).SendAsync("Message", currentPlayer.PlayerID, text, shortFmt);
+    }
+
+    public async Task Resign(string gameId)
+    {
+        // game validation
+        if (!Guid.TryParse(gameId, out var id)) return;
+        var session = _store.Get(id);
+        if (session is null) return;
+
+        var opp = session.Board.GetOppnentPlayer(Context.ConnectionId);
+
+        _store.EndWithWinner(id, opp, out var error);
+        await Clients.Group(gameId).SendAsync("MatchEnded", opp.PlayerID, "opponent resigned.");
+        _clockService.StopClockBroadcast(gameId);
+    }
+
+    public async Task OfferDraw(string gameId)
+    {
+        // game validation
+        if (!Guid.TryParse(gameId, out var id)) return;
+        var session = _store.Get(id);
+        if (session is null) return;
+
+        var opp = session.Board.GetOppnentPlayer(Context.ConnectionId);
+
+        await Clients.Group(gameId).SendAsync("DrawOffer", opp.PlayerID);
+    }
+
+    public async Task OfferResponse(string gameId, bool accept)
+    {
+        // game validation
+        if (!Guid.TryParse(gameId, out var id)) return;
+        var session = _store.Get(id);
+        if (session is null) return;
+
+        var currentPlayer = session.Board.GetPlayerByID(Context.ConnectionId);
+        var opp = session.Board.GetOppnentPlayer(Context.ConnectionId);
+        string message = "";
+        var now = DateTimeOffset.UtcNow;
+        string shortFmt = now.ToString("yyyy-MM-dd HH:mm:ss");
+
+        if (accept)
+        {
+            message = "I accept your draw offer! GG!";
+            _store.GameDraw(id, out var error);
+            await Clients.Group(gameId).SendAsync("GameDraw", "player agreement.");
+            _clockService.StopClockBroadcast(gameId);
+        }
+        else
+        {
+            message = "I decline your draw offer!";
+        }
+
+        await Clients.Group(gameId).SendAsync("Message", currentPlayer.PlayerID, message, shortFmt);
     }
 
 }

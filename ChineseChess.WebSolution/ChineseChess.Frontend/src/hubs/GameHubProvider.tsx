@@ -13,14 +13,21 @@ type GameHubApi = {
     createGame: (tc: string, guestID: string) => Promise<{ gameId: string, board: BoardDto }>;
     joinGame: (roomId: string, guestID: string) => Promise<boolean>;
     makeMove: (roomId: string, from: string, to: string) => Promise<{ ok: boolean; error?: string }>;
+    SendChatMessage: (roomId: string, message: string) => void;
+    Resign : (roomId: string) => void;
+    OfferDraw : (roomId: string) => void;
+    OfferResponse: (roomId: string, accept: boolean) => void;
     // subscriptions
     onState: (h: (b: BoardDto, color: string) => void) => () => void;
     onMoveMade: (h: (m: any, b: BoardDto) => void) => () => void;
     onJoined: (h: (p: JoinedPayload) => void) => () => void;
     onPlayerDisconnected: (h: (color: string) => void) => () => void;
     onMatchEnded: (h: (winnerEmail: string, reason: string) => void) => () => void;
-    onSpectatorJoined : (h: (dto: BoardDto, redID: string, blackID : string) => void) => () => void;
-    onClockUpdate : (h: (redClock: string, blackClock : string) => void) => () => void;
+    onSpectatorJoined: (h: (dto: BoardDto, redID: string, blackID : string) => void) => () => void;
+    onClockUpdate: (h: (redClock: string, blackClock : string) => void) => () => void;
+    onMessage: (h: (playerID: string, message : string, time: string) => void) => () => void;
+    onDrawOffer: (h: (color: string) => void) => () => void;
+    onGameDraw: (h: (reason: string) => void) => () => void;
     // ... add others as needed
 };
 
@@ -56,6 +63,9 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
         conn.on("SpectatorJoined", (dto: BoardDto, redID: string, blackID : string) => listenersRef.current.SpectatorJoined.forEach(h => h(dto, redID, blackID)));
         conn.on("ClockUpdate", (redClock: string, blackClock : string) => listenersRef.current.ClockUpdate.forEach(h => h(redClock, blackClock)));
+        conn.on("Message", (playerID: string, message : string, time: string) => listenersRef.current.Message.forEach(h => h(playerID, message, time)));
+        conn.on("DrawOffer", (color: string) => listenersRef.current.DrawOffer.forEach(h => h(color)));
+        conn.on("GameDraw", (reason: string) => listenersRef.current.GameDraw.forEach(h => h(reason)));
 
 
         connRef.current = conn;
@@ -69,6 +79,9 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         MatchEnded: new Set<(winnerEmail: string, reason: string) => void>(),
         SpectatorJoined: new Set<(dto: BoardDto, redID: string, blackID : string) => void>(),
         ClockUpdate: new Set<(redClock: string, blackClock : string) => void>(),
+        Message: new Set<(playerID: string, message : string, time: string) => void>(),
+        DrawOffer: new Set<(color: string) => void>(),
+        GameDraw: new Set<(reason: string) => void>(),
     });
     
     const api: GameHubApi = useMemo(() => ({
@@ -95,6 +108,22 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         joinGame: async (roomId, guestID) => {
             await api.ensureStarted();
             return connRef.current!.invoke<boolean>("JoinGame", roomId, guestID);
+        },
+        SendChatMessage: async (roomId, message) => {
+            await api.ensureStarted();
+            return connRef.current!.send("SendChatMessage", roomId, message);
+        },
+        Resign: async (roomId) => {
+            await api.ensureStarted();
+            return connRef.current!.send("Resign", roomId);
+        },
+        OfferDraw: async (roomId) => {
+            await api.ensureStarted();
+            return connRef.current!.send("OfferDraw", roomId);
+        },
+        OfferResponse : async (roomId, accept) => {
+            await api.ensureStarted();
+            return connRef.current!.send("OfferResponse", roomId, accept);
         },
         makeMove: async (roomId, from, to) => {
             await api.ensureStarted();
@@ -127,6 +156,18 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         onClockUpdate: (h) => {
             listenersRef.current.ClockUpdate.add(h);
             return () => listenersRef.current.ClockUpdate.delete(h);
+        },
+        onMessage: (h) => {
+            listenersRef.current.Message.add(h);
+            return () => listenersRef.current.Message.delete(h);
+        },
+        onDrawOffer: (h) => {
+            listenersRef.current.DrawOffer.add(h);
+            return () => listenersRef.current.DrawOffer.delete(h);
+        },
+        onGameDraw: (h) => {
+            listenersRef.current.GameDraw.add(h);
+            return () => listenersRef.current.GameDraw.delete(h);
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [ready]);

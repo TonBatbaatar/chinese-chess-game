@@ -9,4 +9,5 @@ public interface IGameStore
     GameSession? Get(Guid id);
     bool TryApplyMove(Guid id, string from, string to, out string? error);
     bool EndWithWinner(Guid id, Player winner, out string? error);
+    bool GameDraw(Guid id, out string? error);
 }
