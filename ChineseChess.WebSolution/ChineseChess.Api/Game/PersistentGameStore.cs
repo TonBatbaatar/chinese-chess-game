@@ -39,11 +39,13 @@ public class PersistentGameStore : IGameStore
             StateJson = _ser.ToJson(board),
             MovesJson = "[]",
             CreatorUserId = creatorUserId, // may be null (guest)
+            RedUserId = creatorUserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
             IsFinished = false,
             Initial = session.Clock.TimeControl.Initial,
-            Increment = session.Clock.TimeControl.Increment
+            Increment = session.Clock.TimeControl.Increment,
+            Result = "0-0"
         };
 
         _db.Games.Add(record);
@@ -52,6 +54,31 @@ public class PersistentGameStore : IGameStore
         return session;
     }
 
+
+    public void PlayerJoined(Guid id, string joiner, out string? error)
+    {
+        error = null;
+
+        var session = Get(id);
+        if (session is null)
+        {
+            error = "Game not found.";
+            return;
+        }
+
+        // get game record
+        var rec = _db.Games.FirstOrDefault(g => g.Id == id);
+        if (rec is null)
+        {
+            error = "Game record missing.";
+            return;
+        }
+
+        // Save snapshot
+        rec.BlackUserId = joiner;
+
+        _db.SaveChanges();
+    }
 
 
     public GameSession? Get(Guid id)
@@ -73,42 +100,6 @@ public class PersistentGameStore : IGameStore
         return session;
     }
 
-
-    /// <summary>
-    /// Store the game with end state to db
-    /// </summary>
-    /// <param name="id">game id</param>
-    /// <param name="winner">winner</param>
-    /// <param name="error"></param>
-    /// <returns></returns>
-    public bool EndWithWinner(Guid id, Player winner, out string? error)
-    {
-
-        error = null;
-
-        var session = Get(id);
-        if (session is null)
-        {
-            error = "Game not found.";
-            return false;
-        }
-
-        // get game record
-        var rec = _db.Games.FirstOrDefault(g => g.Id == id);
-        if (rec is null)
-        {
-            error = "Game record missing.";
-            return false;
-        }
-
-        // Save snapshot
-        rec.StateJson = _ser.ToJson(session.Board);
-        rec.UpdatedAtUtc = DateTime.UtcNow;
-        rec.IsFinished = true;
-
-        _db.SaveChanges();
-        return true;
-    }
 
 
 
@@ -181,6 +172,51 @@ public class PersistentGameStore : IGameStore
         // Save snapshot
         rec.StateJson = _ser.ToJson(session.Board);
         rec.UpdatedAtUtc = DateTime.UtcNow;
+
+        _db.SaveChanges();
+        return true;
+    }
+
+
+    /// <summary>
+    /// Store the game with end state to db
+    /// </summary>
+    /// <param name="id">game id</param>
+    /// <param name="winner">winner</param>
+    /// <param name="error"></param>
+    /// <returns></returns>
+    public bool EndWithWinner(Guid id, Player winner, out string? error)
+    {
+
+        error = null;
+
+        var session = Get(id);
+        if (session is null)
+        {
+            error = "Game not found.";
+            return false;
+        }
+
+        // get game record
+        var rec = _db.Games.FirstOrDefault(g => g.Id == id);
+        if (rec is null)
+        {
+            error = "Game record missing.";
+            return false;
+        }
+
+        // Save snapshot
+        rec.StateJson = _ser.ToJson(session.Board);
+        rec.UpdatedAtUtc = DateTime.UtcNow;
+        rec.IsFinished = true;
+        if (winner.PlayerID == rec.RedUserId)
+        {
+            rec.Result = "1-0";
+        }
+        else
+        {
+            rec.Result = "0-1";
+        }
 
         _db.SaveChanges();
         return true;

@@ -29,4 +29,5 @@ public class GameRecord
 
     public TimeSpan Initial { get; set; }
     public TimeSpan Increment { get; set; }
+    public string? Result { get; set; } // "1-0" "0-1" "1/2-1/2"
 }

@@ -7,6 +7,7 @@ import MatchRoomRoute from "./routes/MatchRoomRoute";
 import ProfilePage from "./pages/Profile";
 import ReplayPage from "./pages/ReplayPage";
 import { useGameHub } from "./hubs/GameHubProvider";
+import { fetchReplays } from "./api/replays";
 
 
 // Gate a route behind auth
@@ -19,7 +20,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const AppRoutes: React.FC = () => {
     const navigate = useNavigate();
-    const { signIn, register, becomeGuest } = useAuth();
+    const { signIn, register, becomeGuest, user } = useAuth();
     const { createGame } = useGameHub();
     
     return (
@@ -53,10 +54,18 @@ const AppRoutes: React.FC = () => {
                 element={
                     <HomePage
                     onCreateRoom={async (opts) => {
-                        const { gameId, board } = await createGame(opts.timeControl);
+                        if (!user) {
+                            navigate("/auth");
+                            return;
+                        } 
+                        const { gameId, board } = await createGame(opts.timeControl, user.displayName);
                         navigate(`/room/${gameId}`, { state: { isCreator: true, tc: opts.timeControl, boardDto: board } });
                     }}
                     onJoinRoom={async (code) => {
+                        if (!user) {
+                            navigate("/auth");
+                            return;
+                        }
                         navigate(`/room/${code}`, { state: { isCreator: false, pendingJoin: true } });
                     }}
                     />
@@ -71,21 +80,14 @@ const AppRoutes: React.FC = () => {
             element={
                 <ReplayPage
                 pageSize={12}
-                // onQuery={async ({ q, tag, tc, page, pageSize }) => {
-                //     // return await api.fetchReplays({ q, tag, tc, page, pageSize });
-                //     return { items: [], total: 0 }; // stub
-                // }}
-                // onOpenReplay={async (id) => {
-                //     // return await api.fetchReplay(id);
-                //     return {
-                //     id,
-                //     redName: "You",
-                //     blackName: "Opponent",
-                //     timeControl: "10|0",
-                //     result: "1-0",
-                //     moves: ["P2+1", "p2+1", "H8+7", "c2+2"],
-                //     };
-                // }}
+                onQuery={(args) => fetchReplays({
+                    userId: args.q,
+                    finished: true,
+                    tc: args.tc,
+                    page: args.page,
+                    pageSize: args.pageSize,
+                    sort: "-UpdatedAtUtc",
+                })}
                 // onExportPgn={async (id) => {
                 //     // await api.exportPGN(id);
                 // }}
@@ -97,7 +99,7 @@ const AppRoutes: React.FC = () => {
             />
 
 
-            {/* TODO: match room */}
+            {/* match room */}
             <Route
             path="/room/:id"
             element={

@@ -3,8 +3,8 @@ import { useLocation, useParams } from "react-router-dom";
 import MatchRoom from "../pages/MatchRoom"; // adjust path
 import { useAuth } from "../context/AuthContext";
 
-type Cell = { r: number; c: number; type: string; owner: "red" | "black" };
-type BoardDto = { rows: number; cols: number; cells: Cell[]; currentPlayer: "red" | "black" };
+type Cell = { r: number; c: number; type: string; owner: "Red" | "Black" };
+type BoardDto = { rows: number; cols: number; cells: Cell[]; currentPlayer: "Red" | "Black" };
 
 type NavState = { isCreator?: boolean; opponentName?: string; tc?: string; pendingJoin?: boolean; boardDto?: BoardDto };
 
@@ -21,7 +21,7 @@ const MatchRoomRoute: React.FC = () => {
   // If creator → you're Red; else you're Black
   const redPlayer = isCreator
     ? { id: "you", name: displayName || "You", rating: 1000 }
-    : { id: "opp", name: state?.opponentName || "Red", rating: 1000 };
+    : { id: "opp", name: state?.opponentName || "Waiting", rating: 1000 };
 
   const blackPlayer = isCreator
     ? { id: "opp", name: state?.opponentName || "Waiting...", rating: 1000 }

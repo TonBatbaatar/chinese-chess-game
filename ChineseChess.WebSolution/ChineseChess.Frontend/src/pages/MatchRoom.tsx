@@ -98,7 +98,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
         
         (async () => {
             if (pendingJoin) {
-                await joinGame(roomId!);
+                await joinGame(roomId!, blackName);
             }
         })();
         

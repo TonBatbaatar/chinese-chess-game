@@ -14,7 +14,7 @@
 - [x] v0.2.0 — Web skeleton (ASP.NET Core + SignalR + React client)
 - [x] v0.3.0 — Rules engine complete
 - [x] v0.4.0 — Stable multiplayer
-- [ ] v0.5.0 — Persistence & accounts
+- [x] v0.5.0 — Persistence & accounts
 - [ ] v0.6.0 — Frontend polish
 - [ ] v0.7.0 — Security & auth
 - [ ] v0.8.0 — Observability & CI/CD

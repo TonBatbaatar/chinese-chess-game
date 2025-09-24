@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore.Infrastructure.Internal;
 using System.ComponentModel.Design.Serialization;
+using Microsoft.VisualBasic;
 
 namespace ChineseChess.Api;
 
@@ -42,7 +43,7 @@ public class GameHub : Hub
     /// Create a new game and auto-join caller to its room
     /// </summary>
     /// <returns>GameID, currentTurn, BoardDTO, seat</returns>
-    public async Task<CreateGameResult> CreateGame(string timeControl)
+    public async Task<CreateGameResult> CreateGame(string timeControl, string guestID)
     {
         var parts = timeControl.Split("|");
         if (!int.TryParse(parts[0], out int initialMinutes) ||
@@ -52,13 +53,13 @@ public class GameHub : Hub
         }
 
         var tc = new TimeControl(TimeSpan.FromMinutes(initialMinutes), TimeSpan.FromSeconds(incrementSeconds));
-        var session = _store.CreateGame(tc, UserId);
+        var session = _store.CreateGame(tc, UserId ?? guestID);
 
         string room = session.Id.ToString();
 
         // assign red player as the creater by default for now
         session.Board.PlayerRed.PlayerConnectionID = Context.ConnectionId;
-        session.Board.PlayerRed.PlayerID = UserId;
+        session.Board.PlayerRed.PlayerID = UserId ?? guestID;
         session.Board.PlayerRed.PlayerEmail = UserEmail;
         session.Board.PlayerRed.IsConnected = true;
         session.Board.PlayerRed.RemainingTime = session.Clock.TimeControl.Initial;
@@ -68,7 +69,7 @@ public class GameHub : Hub
         {
             ConnectionId = Context.ConnectionId,
             GameId = room,
-            UserID = UserId,
+            UserID = UserId ?? guestID,
             UserEmail = UserEmail,
             Color = "Red"
         };
@@ -89,7 +90,7 @@ public class GameHub : Hub
     /// </summary>
     /// <param name="gameId">join game by id</param>
     /// <returns></returns>
-    public async Task<bool> JoinGame(string gameId)
+    public async Task<bool> JoinGame(string gameId, string guestID)
     {
         if (!Guid.TryParse(gameId, out var id)) return false;
         var session = _store.Get(id);
@@ -100,8 +101,8 @@ public class GameHub : Hub
         try
         {
             Player? me =
-                (session.Board.PlayerRed.PlayerID == UserId) ? session.Board.PlayerRed :
-                (session.Board.PlayerBlack.PlayerID == UserId) ? session.Board.PlayerBlack : null;
+                (session.Board.PlayerRed.PlayerID == (UserId ?? guestID)) ? session.Board.PlayerRed :
+                (session.Board.PlayerBlack.PlayerID == (UserId ?? guestID)) ? session.Board.PlayerBlack : null;
 
             if (me != null)
             {
@@ -118,7 +119,7 @@ public class GameHub : Hub
                 {
                     ConnectionId = Context.ConnectionId,
                     GameId = gameId,
-                    UserID = UserId,
+                    UserID = UserId ?? guestID,
                     UserEmail = UserEmail,
                     Color = me.Color.ToString(),
                 };
@@ -134,7 +135,7 @@ public class GameHub : Hub
             if (session.Board.PlayerRed.PlayerID is null)
             {
                 session.Board.PlayerRed.PlayerConnectionID = Context.ConnectionId;
-                session.Board.PlayerRed.PlayerID = UserId;
+                session.Board.PlayerRed.PlayerID = UserId ?? guestID;
                 session.Board.PlayerRed.PlayerEmail = UserEmail;
                 session.Board.PlayerRed.IsConnected = true;
                 session.Board.PlayerRed.RemainingTime = session.Clock.TimeControl.Initial;
@@ -143,11 +144,12 @@ public class GameHub : Hub
             else if (session.Board.PlayerBlack.PlayerID is null)
             {
                 session.Board.PlayerBlack.PlayerConnectionID = Context.ConnectionId;
-                session.Board.PlayerBlack.PlayerID = UserId;
+                session.Board.PlayerBlack.PlayerID = UserId ?? guestID;
                 session.Board.PlayerBlack.PlayerEmail = UserEmail;
                 session.Board.PlayerBlack.IsConnected = true;
                 session.Board.PlayerBlack.RemainingTime = session.Clock.TimeControl.Initial;
                 joinColor = "Black";
+                _store.PlayerJoined(id, UserId ?? guestID, out var error);
             }
             else
             {
@@ -162,7 +164,7 @@ public class GameHub : Hub
             {
                 ConnectionId = Context.ConnectionId,
                 GameId = gameId,
-                UserID = UserId,
+                UserID = UserId ?? guestID,
                 UserEmail = UserEmail,
                 Color = joinColor
             };

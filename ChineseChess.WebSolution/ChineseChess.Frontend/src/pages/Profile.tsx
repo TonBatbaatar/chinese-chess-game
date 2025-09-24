@@ -3,6 +3,8 @@ import React from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+import TopNav from "../components/home/TopNav";
+
 const ProfilePage: React.FC = () => {
   const { user, displayName, signOut, isHydrating } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +28,8 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+      <TopNav />
+
       <div className="mx-auto max-w-3xl px-4 py-12">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl">
           <div className="flex items-center gap-4">

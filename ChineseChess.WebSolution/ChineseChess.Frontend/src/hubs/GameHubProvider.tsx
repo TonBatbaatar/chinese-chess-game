@@ -10,8 +10,8 @@ type GameHubApi = {
     stop: () => Promise<void>;
     ensureStarted: () => Promise<void>;
     // hub methods
-    createGame: (tc: string) => Promise<{ gameId: string, board: BoardDto }>;
-    joinGame: (roomId: string) => Promise<boolean>;
+    createGame: (tc: string, guestID: string) => Promise<{ gameId: string, board: BoardDto }>;
+    joinGame: (roomId: string, guestID: string) => Promise<boolean>;
     makeMove: (roomId: string, from: string, to: string) => Promise<{ ok: boolean; error?: string }>;
     // subscriptions
     onState: (h: (b: BoardDto, color: string) => void) => () => void;
@@ -88,13 +88,13 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ensureStarted: async () => {
             if (!ready) await api.start();
         },
-        createGame: async (tc) => {
+        createGame: async (tc, guestID) => {
             await api.ensureStarted();
-            return connRef.current!.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame", tc);
+            return connRef.current!.invoke<{ gameId: string; currentTurn: string; board: BoardDto; seat:string }>("CreateGame", tc, guestID);
         },
-        joinGame: async (roomId) => {
+        joinGame: async (roomId, guestID) => {
             await api.ensureStarted();
-            return connRef.current!.invoke<boolean>("JoinGame", roomId);
+            return connRef.current!.invoke<boolean>("JoinGame", roomId, guestID);
         },
         makeMove: async (roomId, from, to) => {
             await api.ensureStarted();
