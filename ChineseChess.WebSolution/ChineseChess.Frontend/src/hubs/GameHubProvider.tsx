@@ -28,7 +28,6 @@ type GameHubApi = {
     onMessage: (h: (playerID: string, message : string, time: string) => void) => () => void;
     onDrawOffer: (h: (color: string) => void) => () => void;
     onGameDraw: (h: (reason: string) => void) => () => void;
-    // ... add others as needed
 };
 
 const Ctx = createContext<GameHubApi | null>(null);
@@ -40,7 +39,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const buildIfNeeded = () => {
         if (connRef.current) return;
         const conn = new HubConnectionBuilder()
-        .withUrl("/hub/game", { withCredentials: true }) // cookie auth; if JWT, use accessTokenFactory
+        .withUrl("/hub/game", { withCredentials: true }) // cookie auth
         .withAutomaticReconnect()
         .build();
         
@@ -48,25 +47,16 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         conn.on("State", (dto: BoardDto, color: string) => listenersRef.current.State.forEach(h => h(dto, color)));
         conn.on("MoveMade", (m: any, dto: BoardDto) => listenersRef.current.MoveMade.forEach(h => h(m, dto)));
         conn.on("Joined", (connId: string, redEmail: string, blackEmail: string) => {
-            // console.log("[Handler fired] Joined event received", { connId, redEmail, blackEmail }); // debug code
             const payload: JoinedPayload = { connId, redEmail, blackEmail };
-            // console.log("Dispatching to", listenersRef.current.Joined.size, "Joined listeners");
-            listenersRef.current.Joined.forEach((h) => {
-                // console.log(`--> Invoking listener #${i}`); // debug code
-                h(payload);
-            });
+            listenersRef.current.Joined.forEach((h) => {h(payload);});
         });
         conn.on("PlayerDisconnected", (color: string) => listenersRef.current.PlayerDisconnected.forEach(h => h(color)));
-        conn.on("MatchEnded", (winnerEmail: string, reason : string) => {
-            console.log("[Handler fired] Match Ended event received", winnerEmail, reason); // debug code
-            listenersRef.current.MatchEnded.forEach(h => h(winnerEmail, reason));
-        });
+        conn.on("MatchEnded", (winnerEmail: string, reason : string) => {listenersRef.current.MatchEnded.forEach(h => h(winnerEmail, reason));});
         conn.on("SpectatorJoined", (dto: BoardDto, redID: string, blackID : string) => listenersRef.current.SpectatorJoined.forEach(h => h(dto, redID, blackID)));
         conn.on("ClockUpdate", (redClock: string, blackClock : string) => listenersRef.current.ClockUpdate.forEach(h => h(redClock, blackClock)));
         conn.on("Message", (playerID: string, message : string, time: string) => listenersRef.current.Message.forEach(h => h(playerID, message, time)));
         conn.on("DrawOffer", (color: string) => listenersRef.current.DrawOffer.forEach(h => h(color)));
         conn.on("GameDraw", (reason: string) => listenersRef.current.GameDraw.forEach(h => h(reason)));
-
 
         connRef.current = conn;
     };
@@ -169,15 +159,12 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
             listenersRef.current.GameDraw.add(h);
             return () => listenersRef.current.GameDraw.delete(h);
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [ready]);
     
     return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 };
 
 export const useGameHub = () => {
-    // const instanceId = useRef(Math.random().toString(36).slice(2)); // debug code
-    // console.log("[Provider instance]", instanceId.current); // debug code
     const ctx = useContext(Ctx);
     if (!ctx) throw new Error("useGameHub must be used within GameHubProvider");
     return ctx;
