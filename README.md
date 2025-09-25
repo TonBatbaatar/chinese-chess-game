@@ -1,6 +1,7 @@
 [![Azure Static Web Apps CI/CD](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/azure-static-web-apps-ashy-grass-0231f1603.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/azure-static-web-apps-ashy-grass-0231f1603.yml)
 [![Build and deploy ASP.Net Core app to Azure Web App - ChineseChess-Api](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/main_chinesechess-api.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/main_chinesechess-api.yml)
 [![CI — WebSolution (.NET API + Frontend)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/ci.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/ci.yml)
+[![Azure Static Web Apps](https://img.shields.io/badge/Deployed-Azure-blue?logo=microsoft-azure)](https://ashy-grass-0231f1603.2.azurestaticapps.net)
 
 # Chinese Chess (Xiangqi) — Web App
 
