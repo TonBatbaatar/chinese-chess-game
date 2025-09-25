@@ -273,7 +273,6 @@ public class GameHub : Hub
                 await Clients.Group(gameId).SendAsync("MatchEnded", CurrentPlayer.PlayerID, "Checkmate!");
                 _clockService.StopClockBroadcast(gameId);
             }
-
             return new MoveResponse(true, null, BoardMapper.ToDto(board));
         }
         finally
