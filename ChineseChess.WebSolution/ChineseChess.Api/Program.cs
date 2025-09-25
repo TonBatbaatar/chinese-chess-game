@@ -3,15 +3,14 @@ using ChineseChess.Api;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ChineseChess.Api.Game;
-using Microsoft.OpenApi.Models; //for swagger
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
-// SQLLite database with EF
-builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=chinesechess.db"));
+var cs = builder.Configuration.GetConnectionString("Default");
+builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(cs));
 
 // Identity (cookie-based)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
@@ -43,7 +42,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", p => p
-        .WithOrigins("http://localhost:5173")
+        .WithOrigins(
+            "http://localhost:5173",
+            "https://ashy-grass-0231f1603.2.azurestaticapps.net"
+            )
+
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials());
@@ -56,7 +59,7 @@ builder.Services.AddScoped<IGameStore, PersistentGameStore>();
 
 var app = builder.Build();
 
-// app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 // app.UseStaticFiles();
 // app.UseRouting();
 
