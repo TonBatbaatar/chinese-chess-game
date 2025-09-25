@@ -176,12 +176,12 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
         placeholder="Search player or tag…"
         className="w-56 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm placeholder:text-slate-400"
         />
-        <select value={tag} onChange={(e) => { setTag(e.target.value as any); setPage(1); }} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm">
+        <select value={tag} onChange={(e) => { setTag(e.target.value as "all" | "ranked" | "friendly"); setPage(1); }} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm">
         <option value="all">All</option>
         <option value="ranked">Ranked</option>
         <option value="friendly">Friendly</option>
         </select>
-        <select value={tc} onChange={(e) => { setTc(e.target.value as any); setPage(1); }} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm">
+        <select value={tc} onChange={(e) => { setTc(e.target.value as "any" | "3|2" | "5|5" | "10|0" | "15|10"); setPage(1); }} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm">
         <option value="any">Any TC</option>
         <option>3|2</option>
         <option>5|5</option>

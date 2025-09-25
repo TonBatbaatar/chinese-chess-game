@@ -255,7 +255,7 @@ public class GameHub : Hub
 
             session.Clock.OnMoveCommitted(CurrentPlayer);
             // Broadcast new state
-            await Clients.Group(gameId).SendAsync("MoveMade", new { from, to }, BoardMapper.ToDto(board));
+            await Clients.Group(gameId).SendAsync("MoveMade", BoardMapper.ToDto(board));
 
 
             // part 3: game over check

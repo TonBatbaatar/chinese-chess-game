@@ -6,7 +6,7 @@ import ActionPanel from "../components/matchroom/ActionPanel";
 import Board, { type Coord, type BoardProps } from "../components/matchroom/Board";
 import MoveList from "../components/matchroom/MoveList";
 import Chat, { type ChatProps } from "../components/matchroom/Chat";
-import { useGameHub } from "../hubs/GameHubProvider";
+import { useGameHub } from "../hubs/useGameHub";
 import Modal from "../components/matchroom/Modal";
 
 type Cell = { r: number; c: number; type: string; owner: "Red" | "Black" };
@@ -81,7 +81,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
             applyServerState(dto);
         });
         
-        const offMoveMade = onMoveMade((_m: any, dto: BoardDto) => {
+        const offMoveMade = onMoveMade((dto: BoardDto) => {
             applyServerState(dto);
         });
         
@@ -169,7 +169,6 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
     // render board to creator for the first time
     useEffect(() => {
         if (boardDto) {
-            console.log("initial board rendered!", boardDto.currentPlayer);
             applyServerState(boardDto);
         }
     }, [boardDto]);
@@ -199,7 +198,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
     const handleSquareClick: BoardProps["onSquareClick"] = async (x, y) => {
         if (isSpectate || isGameOver) return; // spectators can't interact
         
-        var sideToMoveName = "";
+        let sideToMoveName = "";
         if(sideToMove==="Red"){
             sideToMoveName = redName;
         }else{
@@ -251,7 +250,7 @@ const MatchRoom: React.FC<MatchRoomProps> = ({
         try {
             await Promise.resolve(SendChatMessage(roomId, text));
         } catch (e) {
-            // Optional: append a system error message
+            setError(getErrorMessage(e));
             const now = new Date().toISOString();
             setMessages(prev => [
                 ...prev,
@@ -473,4 +472,10 @@ function toAlgebraic(c: Coord): string {
     const file = files[c.x] ?? "?";
     const rank = c.y + 1; // top row y=0 -> 1; bottom y=9 -> 10
     return `${file}${rank}`;
+}
+
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try { return JSON.stringify(e); } catch { return String(e); }
 }

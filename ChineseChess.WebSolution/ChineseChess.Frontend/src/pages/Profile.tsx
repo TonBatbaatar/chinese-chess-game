@@ -1,7 +1,7 @@
 // src/pages/ProfilePage.tsx
 import React from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 import TopNav from "../components/home/TopNav";
 

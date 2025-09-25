@@ -1,7 +1,7 @@
 import React from "react";
 import { useLocation, useParams } from "react-router-dom";
 import MatchRoom from "../pages/MatchRoom"; // adjust path
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
 
 type Cell = { r: number; c: number; type: string; owner: "Red" | "Black" };

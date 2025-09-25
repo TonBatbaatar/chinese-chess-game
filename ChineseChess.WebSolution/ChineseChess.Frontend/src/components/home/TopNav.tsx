@@ -1,9 +1,8 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 
-type TopNavProps = {};
-
+type TopNavProps = Record<string, never>;
 const TopNav: React.FC<TopNavProps> = () => {
   const { user, displayName, signOut } = useAuth();
   // console.log("TopNav user =", user, "displayName =", displayName); // debug code

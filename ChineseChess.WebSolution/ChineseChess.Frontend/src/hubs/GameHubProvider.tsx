@@ -1,36 +1,8 @@
-import React, { createContext, useContext, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
+import type { BoardDto, GameHubApi, JoinedPayload } from "./GameHubTypes";
+import { Ctx } from "./GameHubContext";
 
-type BoardDto = { rows: number; cols: number; cells: any[]; currentPlayer: "Red" | "Black" };
-type JoinedPayload = { connId: string; redEmail: string; blackEmail: string };
-
-type GameHubApi = {
-    ready: boolean;
-    start: () => Promise<void>;
-    stop: () => Promise<void>;
-    ensureStarted: () => Promise<void>;
-    // hub methods
-    createGame: (tc: string, guestID: string) => Promise<{ gameId: string, board: BoardDto }>;
-    joinGame: (roomId: string, guestID: string) => Promise<boolean>;
-    makeMove: (roomId: string, from: string, to: string) => Promise<{ ok: boolean; error?: string }>;
-    SendChatMessage: (roomId: string, message: string) => void;
-    Resign : (roomId: string) => void;
-    OfferDraw : (roomId: string) => void;
-    OfferResponse: (roomId: string, accept: boolean) => void;
-    // subscriptions
-    onState: (h: (b: BoardDto, color: string) => void) => () => void;
-    onMoveMade: (h: (m: any, b: BoardDto) => void) => () => void;
-    onJoined: (h: (p: JoinedPayload) => void) => () => void;
-    onPlayerDisconnected: (h: (color: string) => void) => () => void;
-    onMatchEnded: (h: (winnerEmail: string, reason: string) => void) => () => void;
-    onSpectatorJoined: (h: (dto: BoardDto, redID: string, blackID : string) => void) => () => void;
-    onClockUpdate: (h: (redClock: string, blackClock : string) => void) => () => void;
-    onMessage: (h: (playerID: string, message : string, time: string) => void) => () => void;
-    onDrawOffer: (h: (color: string) => void) => () => void;
-    onGameDraw: (h: (reason: string) => void) => () => void;
-};
-
-const Ctx = createContext<GameHubApi | null>(null);
 
 export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const connRef = useRef<HubConnection | null>(null);
@@ -45,7 +17,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         // wire events to listener registries
         conn.on("State", (dto: BoardDto, color: string) => listenersRef.current.State.forEach(h => h(dto, color)));
-        conn.on("MoveMade", (m: any, dto: BoardDto) => listenersRef.current.MoveMade.forEach(h => h(m, dto)));
+        conn.on("MoveMade", (dto: BoardDto) => listenersRef.current.MoveMade.forEach(h => h(dto)));
         conn.on("Joined", (connId: string, redEmail: string, blackEmail: string) => {
             const payload: JoinedPayload = { connId, redEmail, blackEmail };
             listenersRef.current.Joined.forEach((h) => {h(payload);});
@@ -63,7 +35,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     const listenersRef = useRef({
         State: new Set<(b: BoardDto, color: string) => void>(),
-        MoveMade: new Set<(m: any, b: BoardDto) => void>(),
+        MoveMade: new Set<(b: BoardDto) => void>(),
         Joined: new Set<(p: JoinedPayload) => void>(),
         PlayerDisconnected: new Set<(color: string) => void>(),
         MatchEnded: new Set<(winnerEmail: string, reason: string) => void>(),
@@ -162,10 +134,4 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }), [ready]);
     
     return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
-};
-
-export const useGameHub = () => {
-    const ctx = useContext(Ctx);
-    if (!ctx) throw new Error("useGameHub must be used within GameHubProvider");
-    return ctx;
 };

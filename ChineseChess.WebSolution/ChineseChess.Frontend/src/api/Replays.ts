@@ -1,3 +1,15 @@
+export type ReplayMeta = {
+    id: string;
+    redUserId?: string;
+    blackUserId?: string;
+    timeControl: string;   // "10|0"
+    isFinished: boolean;
+    createdAtUtc: string;  // DateTime → ISO string
+    updatedAtUtc: string;
+    moveCount: number;
+    result : string;
+};
+
 export interface ReplayQueryArgs {
     userId?: string;
     finished?: boolean;
@@ -8,6 +20,7 @@ export interface ReplayQueryArgs {
     pageSize?: number;
     sort?: string;
 }
+
 export async function fetchReplays({ userId, finished, tc, fromUtc, toUtc, page, pageSize, sort } : ReplayQueryArgs) {
     const p = new URLSearchParams();
     if (userId) p.set("userId", userId);
@@ -21,7 +34,7 @@ export async function fetchReplays({ userId, finished, tc, fromUtc, toUtc, page,
     
     const res = await fetch(`/api/replays?${p.toString()}`);
     if (!res.ok) throw new Error("Failed to load replays");
-    return res.json() as Promise<{ items: any[]; total: number }>;
+    return res.json() as Promise<{ items: ReplayMeta[]; total: number }>;
 }
 
 export async function fetchReplay(id: string) {

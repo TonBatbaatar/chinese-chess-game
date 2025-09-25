@@ -1,12 +1,12 @@
 import React from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 import HomePage from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
 import MatchRoomRoute from "./routes/MatchRoomRoute";
 import ProfilePage from "./pages/Profile";
 import ReplayPage from "./pages/ReplayPage";
-import { useGameHub } from "./hubs/GameHubProvider";
+import { useGameHub } from "./hubs/useGameHub";
 import { fetchReplays } from "./api/replays";
 
 
