@@ -1,3 +1,5 @@
+import { apiUrl } from "./fetchHelper";
+
 export type ReplayMeta = {
     id: string;
     redUserId?: string;
@@ -32,13 +34,13 @@ export async function fetchReplays({ userId, finished, tc, fromUtc, toUtc, page,
     p.set("pageSize", String(pageSize ?? 12));
     if (sort) p.set("sort", sort);
     
-    const res = await fetch(`/api/replays?${p.toString()}`);
+    const res = await fetch(apiUrl(`/api/replays?${p.toString()}`));
     if (!res.ok) throw new Error("Failed to load replays");
     return res.json() as Promise<{ items: ReplayMeta[]; total: number }>;
 }
 
 export async function fetchReplay(id: string) {
-    const res = await fetch(`/api/replays/${id}`);
+    const res = await fetch(apiUrl(`/api/replays/${id}`));
     if (!res.ok) throw new Error("Replay not found");
     return res.json();
 }

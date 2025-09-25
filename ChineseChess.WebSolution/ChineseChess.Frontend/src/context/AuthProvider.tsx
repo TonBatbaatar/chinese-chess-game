@@ -2,6 +2,7 @@
 import React, {useEffect, useMemo, useState} from "react";
 import type { AuthCtx, AuthUser } from "./AuthTypes";
 import { AuthContext } from "./AuthContext";
+import { apiUrl } from "../api/fetchHelper";
 
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -23,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const refreshMe = async () => {
         try {
             setIsHydrating(true);
-            const res = await fetch("/api/auth/me", { credentials: "include" });
+            const res = await fetch(apiUrl("/api/auth/me"), { credentials: "include" });
             if (!res.ok) return; // not signed in
             const me = await res.json().catch(() => null);
             // console.log(me); // debug code
@@ -53,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Email/password sign in (cookie-session version)
     const signIn = async (email: string, password: string) => {
-        const res = await fetch("/api/auth/login", {
+        const res = await fetch(apiUrl("/api/auth/login"), {
             method: "POST",
             credentials: "include", // remove if you use JWT only
             headers: { "Content-Type": "application/json" },
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: string,
         password: string
     ) => {
-        const res = await fetch("/api/auth/register", {
+        const res = await fetch(apiUrl("/api/auth/register"), {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /** Clear server session (if any) and local state */
     const signOut = async () => {
         try {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+            await fetch(apiUrl("/api/auth/logout"), { method: "POST", credentials: "include" });
         } catch {
             // ignore network errors; still clear locally
         } finally {

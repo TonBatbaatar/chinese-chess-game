@@ -3,6 +3,7 @@ using ChineseChess.Api;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ChineseChess.Api.Game;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,15 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;           // allow cross-site
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // HTTPS only
+    // Optional (nice for SPA): return 401/403 instead of HTML redirects
+    options.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
+    options.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
+});
+
 // cache services
 builder.Services.AddMemoryCache(); // IMemoryCache (singleton)
 builder.Services.AddSingleton<IGameSessionCache, InMemoryGameSessionCache>();
@@ -38,18 +48,19 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS for dev (frontend at 5173)
+var allowedOrigins = new[]
+{
+    "https://ashy-grass-0231f1603.2.azurestaticapps.net",
+    "http://localhost:5173"
+};
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("DevCors", p => p
-        .WithOrigins(
-            "http://localhost:5173",
-            "https://ashy-grass-0231f1603.2.azurestaticapps.net"
-            )
-
+    options.AddPolicy("FrontendCors", p => p
+        .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowCredentials());
+        .AllowCredentials()); // needed for cookies/SignalR with cookies
 });
 
 // Game Services: Register in-memory game store
@@ -59,17 +70,22 @@ builder.Services.AddScoped<IGameStore, PersistentGameStore>();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
-// app.UseStaticFiles();
-// app.UseRouting();
-
-if (app.Environment.IsDevelopment())
+if (!app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(); // browse at /swagger
+    app.UseHsts();
 }
 
-app.UseCors("DevCors");
+app.UseHttpsRedirection();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
+app.UseRouting();
+
+app.UseCors("FrontendCors");
+
 app.UseAuthentication();
 app.UseAuthorization();
 

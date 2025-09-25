@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { HubConnection, HubConnectionBuilder } from "@microsoft/signalr";
 import type { BoardDto, GameHubApi, JoinedPayload } from "./GameHubTypes";
 import { Ctx } from "./GameHubContext";
+import { apiUrl } from "../api/fetchHelper";
 
 
 export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -11,7 +12,7 @@ export const GameHubProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const buildIfNeeded = () => {
         if (connRef.current) return;
         const conn = new HubConnectionBuilder()
-        .withUrl("/hub/game", { withCredentials: true }) // cookie auth
+        .withUrl(apiUrl("/hub/game"), { withCredentials: true }) // cookie auth
         .withAutomaticReconnect()
         .build();
         
