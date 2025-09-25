@@ -4,7 +4,8 @@
 
 # Chinese Chess (Xiangqi) — Web App
 
-## 🎮 [Click here to play!](https://ashy-grass-0231f1603.2.azurestaticapps.net) · [Play Guide](#how-to-play-online)
+## 🎮 [Click here to play!](https://ashy-grass-0231f1603.2.azurestaticapps.net)  
+[![Play Guide](https://img.shields.io/badge/Play%20Guide-Instructions-blue)](#-how-to-play-online)
 
 **Status:** `v0.6.0` _(in development)_  
 **Stack:** ASP.NET Core · EF Core · SignalR · React (Vite + TS) · TailwindCSS · Azure  
