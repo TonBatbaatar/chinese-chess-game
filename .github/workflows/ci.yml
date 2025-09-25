@@ -1,54 +1,42 @@
-name: ChineseChess CI
+name: CI — WebSolution (.NET API + Frontend)
 
 on:
   push:
-    branches: [ main, develop, dev ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, develop, dev ]
+    branches: [main, master]
 
-# Cancel older in-progress runs on the same branch
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   backend:
-    name: .NET Backend – Build & Test
+    name: Build & Test — .NET WebSolution
     runs-on: ubuntu-latest
-
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # DEBUG: list where the solution actually is (first run only)
+      - name: Find solutions and projects
+        run: |
+          echo "Solutions:"; ls -la ChineseChess.WebSolution/*.sln || true
+          echo "Projects:";  find ChineseChess.WebSolution -name "*.csproj" -maxdepth 3
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            9.0.x
-
-      - name: Cache NuGet
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+          dotnet-version: '9.0.x'
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore ChineseChess.WebSolution/ChineseChess.Web.sln
 
       - name: Build (Release)
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build ChineseChess.WebSolution/ChineseChess.Web.sln --no-restore -c Release
 
-      - name: Test (with coverage)
-        run: |
-          dotnet test --configuration Release --no-build \
-            --logger "trx;LogFileName=test-results.trx" \
-            --collect:"XPlat Code Coverage"
+      - name: Test (Engine tests)
+        run: dotnet test ChineseChess.WebSolution/ChineseChess.Engine.Tests/ChineseChess.Engine.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test_results.trx" --collect:"XPlat Code Coverage"
 
       - name: Upload test results
         if: always()
@@ -56,26 +44,25 @@ jobs:
         with:
           name: dotnet-test-results
           path: |
-            **/TestResults/*.trx
+            **/TestResults/**/*.trx
+            **/TestResults/**/coverage.cobertura.xml
+          if-no-files-found: ignore
 
-      - name: Upload coverage (cobertura)
-        if: always()
+      - name: Publish API
+        run: dotnet publish ChineseChess.WebSolution/ChineseChess.Api/ChineseChess.Api.csproj -c Release -o ChineseChess.WebSolution/publish
+
+      - name: Upload API publish
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
-          path: |
-            **/TestResults/*/coverage.cobertura.xml
-            **/TestResults/*/coverage.info
-            **/TestResults/*/coverage.json
+          name: api-publish
+          path: ChineseChess.WebSolution/publish
 
   frontend:
-    name: Frontend – Install & Build
+    name: Build — Frontend
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ChineseChess.WebSolution/ChineseChess.Frontend
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,22 +70,27 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ChineseChess.WebSolution/ChineseChess.Frontend/package-lock.json
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json # <<< adjust if yarn/pnpm
 
-      - name: Install deps
+      - name: Install
         run: npm ci
 
       - name: Lint
         run: npm run lint --if-present
 
+      - name: Test
+        run: npm test --if-present -- --ci --watchAll=false
+
       - name: Build
         run: npm run build
 
-      - name: Upload built frontend
-        if: always()
+      - name: Upload Web build
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
-          path: ChineseChess.WebSolution/ChineseChess.Frontend/dist
+          name: web-build
+          path: |
+            frontend/build
+            frontend/dist
+          if-no-files-found: ignore
