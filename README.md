@@ -1,12 +1,24 @@
+[![Azure Static Web Apps CI/CD](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/azure-static-web-apps-ashy-grass-0231f1603.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/azure-static-web-apps-ashy-grass-0231f1603.yml)
+[![Build and deploy ASP.Net Core app to Azure Web App - ChineseChess-Api](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/main_chinesechess-api.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/main_chinesechess-api.yml)
+[![CI — WebSolution (.NET API + Frontend)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/ci.yml/badge.svg)](https://github.com/TonBatbaatar/chinese-chess-game/actions/workflows/ci.yml)
+
 # Chinese Chess (Xiangqi) — Web App
 
-**Status:** v0.6.0 (in development)  
-**Stack:** ASP.NET Core · EF Core · SignalR · React (Vite + TS) · Tailwind · Azure
+## 🎮 [Click here to play!](https://ashy-grass-0231f1603.2.azurestaticapps.net) · [Play Guide](#how-to-play-online)
 
-## Live (coming soon)
+**Status:** `v0.6.0` _(in development)_  
+**Stack:** ASP.NET Core · EF Core · SignalR · React (Vite + TS) · TailwindCSS · Azure  
 
-- API: _(to be added)_
-- Web: _(to be added)_
+## 🌐 Live Services 
+
+- API: [Backend Server](chinesechess-api-b9egengqahddhphn.uksouth-01.azurewebsites.net)
+- Web: [Frontend Client](https://ashy-grass-0231f1603.2.azurestaticapps.net)
+
+## Project Management
+
+- GitHub **Issues** for tasks/bugs · [Issues](https://github.com/TonBatbaatar/chinese-chess-game/issues)
+- GitHub **Milestones** for version planning · [Milestones](https://github.com/TonBatbaatar/chinese-chess-game/milestones)
+- GitHub **Project Board**: [Roadmap to v1.0.0](https://github.com/users/TonBatbaatar/projects/1)
 
 ## Roadmap
 
@@ -21,16 +33,10 @@
 - [ ] v0.9.0 — Pre-production hardening
 - [ ] v1.0.0 — Production launch
 
-## Project Management
-
-- GitHub **Issues** for tasks/bugs
-- GitHub **Milestones** for version planning
-- GitHub **Project Board**: [Roadmap to v1.0.0](https://github.com/users/TonBatbaatar/projects/1)
-
 ## Run locally
 
 - API: `dotnet run` in `ChineseChess.Api`
-- Web: `pnpm install && pnpm dev` in `ChineseChess.Frontend`
+- Web: `npm install && npm run dev` in `ChineseChess.Frontend`
 
 ## License
 
@@ -39,6 +45,18 @@ MIT
 ---
 
 ## 🚀 Getting Started
+
+## 🎲 How to Play Online
+
+1. **Register an account** — or continue as a **guest**  
+2. **Sign in** — or proceed as **guest**  
+3. **Create a room** or **join an existing one**  
+   - Room number appears in the **top-left corner**  
+   - Or simply share the **URL** with your friend  
+4. ✅ Start playing and enjoy the game!
+
+---
+
 
 ## Clone
 
@@ -87,7 +105,7 @@ git clone https://github.com/TonBatbaatar/chinese-chess-game.git
    ```
    Once connected, the game will begin.
 
-## How to Run a Web App Chess Game:
+## How to Run a Web App Chess Game Locally:
 
 1. Run the backend server
    ```bash
