@@ -7,7 +7,7 @@ import MatchRoomRoute from "./routes/MatchRoomRoute";
 import ProfilePage from "./pages/Profile";
 import ReplayPage from "./pages/ReplayPage";
 import { useGameHub } from "./hubs/useGameHub";
-import { fetchReplays } from "./api/replays";
+import { fetchReplays, fetchReplay } from "./api/replays";
 
 
 // Gate a route behind auth
@@ -88,6 +88,7 @@ const AppRoutes: React.FC = () => {
                     pageSize: args.pageSize,
                     sort: "-UpdatedAtUtc",
                 })}
+                onOpenReplay={(args) => fetchReplay(args)}
                 // onExportPgn={async (id) => {
                 //     // await api.exportPGN(id);
                 // }}

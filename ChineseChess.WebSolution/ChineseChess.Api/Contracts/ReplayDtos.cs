@@ -9,20 +9,17 @@ public sealed record ReplayListItemDto(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     int MoveCount,           // derived from MovesJson
-    string? Result
+    string? Result,
+    string? MovesJson
 );
 
 public sealed record ReplayDetailDto(
     Guid Id,
-    string? CreatorUserId,
     string? RedUserId,
     string? BlackUserId,
     string TimeControl,
-    bool IsFinished,
-    DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc,
-    string StateJson,        // raw JSON snapshot (BoardDto)
-    IReadOnlyList<string> Moves
+    string? Result,
+    string? MovesJson
 );
 
 public sealed record ReplayQueryDto(

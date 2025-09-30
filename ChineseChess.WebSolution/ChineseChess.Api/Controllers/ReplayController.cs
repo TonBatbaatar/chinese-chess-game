@@ -79,35 +79,32 @@ public sealed class ReplaysController : ControllerBase
                 r.CreatedAtUtc,
                 r.UpdatedAtUtc,
                 r.MovesJson == "[]" ? 0 : (r.MovesJson.Length - r.MovesJson.Replace(",", "").Length + 1),
-                r.Result
+                r.Result,
+                r.MovesJson
             )).ToListAsync(ct);
 
         return Ok(new PagedResult<ReplayListItemDto>(items, total));
     }
 
     // GET /api/replays/{id}
-    // [HttpGet("{id:guid}")]
-    // public async Task<ActionResult<ReplayDetailDto>> GetOne(Guid id, CancellationToken ct)
-    // {
-    //     var rec = await _db.GameRecords.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-    //     if (rec is null) return NotFound();
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ReplayDetailDto>> GetOne(Guid id, CancellationToken ct)
+    {
+        var rec = await _db.Games.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (rec is null) return NotFound();
 
-    //     var moves = JsonSerializer.Deserialize<List<string>>(rec.MovesJson) ?? new();
-    //     var dto = new ReplayDetailDto(
-    //         rec.Id,
-    //         rec.CreatorUserId,
-    //         rec.RedUserId,
-    //         rec.BlackUserId,
-    //         $"{(int)rec.Initial.TotalMinutes}|{(int)rec.Increment.TotalSeconds}",
-    //         rec.IsFinished,
-    //         rec.CreatedAtUtc,
-    //         rec.UpdatedAtUtc,
-    //         rec.StateJson,
-    //         moves
-    //     );
+        var moves = JsonSerializer.Deserialize<List<string>>(rec.MovesJson) ?? new();
+        var dto = new ReplayDetailDto(
+            rec.Id,
+            rec.RedUserId,
+            rec.BlackUserId,
+            $"{(int)rec.Initial.TotalMinutes}|{(int)rec.Increment.TotalSeconds}",
+            rec.Result,
+            rec.MovesJson
+        );
 
-    //     return Ok(dto);
-    // }
+        return Ok(dto);
+    }
 
     // GET /api/replays/{id}/pgn  (simple Xiangqi-ish export)
     // [HttpGet("{id:guid}/pgn")]

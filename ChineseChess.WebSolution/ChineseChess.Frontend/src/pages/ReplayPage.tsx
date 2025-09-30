@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import UnderDevelopmentDialog from "../components/UnderDevelopmentDialog";
 
 import TopNav from "../components/home/TopNav";
+import { boardAfterPly } from "../utils/replayBoardHelper";
+import Board from "../components/matchroom/Board";
 
 /* =========================
 Types
@@ -15,16 +17,18 @@ export type ReplayMeta = {
     createdAtUtc: string;  // DateTime → ISO string
     updatedAtUtc: string;
     moveCount: number;
-    result : string;
+    result: string;
+    movesJson: string;
 };
 
 /* A minimal replay data shape for the viewer */
 export type ReplayData = {
     id: string;
-    redName: string;
-    blackName: string;
+    redUserId: string;
+    blackUserId: string;
     timeControl: string;
     result : string;
+    movesJson: string;
 };
 
 export type ReplayPageProps = {
@@ -106,6 +110,7 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
                 updatedAtUtc: new Date().toISOString(),
                 moveCount: 42,
                 result: "1-0",
+                movesJson: "[]",
             },
             {
                 id: "r2",
@@ -117,6 +122,7 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
                 updatedAtUtc: new Date().toISOString(),
                 moveCount: 58,
                 result: "1-0",
+                movesJson: "[]",
             },
             {
                 id: "r3",
@@ -128,9 +134,20 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
                 updatedAtUtc: new Date().toISOString(),
                 moveCount: 31,
                 result: "1-0",
+                movesJson: "[]",
             },
         ];
     }, [items, replays]);
+
+    const moves = useMemo<string[]>(() => {
+        if (viewer == null) return null;
+        else{
+            return Array.isArray(viewer.movesJson)
+            ? viewer.movesJson
+            : JSON.parse(viewer.movesJson);
+        }
+        
+    }, [viewer]);
     
     const totalPages = Math.max(1, Math.ceil(count / pageSize));
     
@@ -139,26 +156,31 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             // simple mock viewer
             setViewer({
                 id,
-                redName: "Red",
-                blackName: "Black",
+                redUserId: "Red",
+                blackUserId: "Black",
                 result: "1-0",
                 timeControl: "10|0",
+                movesJson: "[]"
             });
             setPly(0);
             return;
         }
         const data = await onOpenReplay(id);
+        console.log(data);//debug code
         setViewer(data);
         setPly(0);
     };
+
+    const { board, sideToMove } = useMemo(() => boardAfterPly(moves, ply), [moves, ply]);
     
     const onFirst = () => setPly(0);
-    const onPrev = () => setPly(0);
-    const onNext = () => setPly(0);
-    const onLast = () => setPly(0);
-    // const onPrev = () => setPly((p) => Math.max(0, p - 1));
-    // const onNext = () => setPly((p) => Math.min((viewer?.moves.length ?? 1) - 1, p + 1));
-    // const onLast = () => setPly((viewer?.moves.length ?? 1) - 1);
+    // const onPrev = () => setPly(0);
+    // const onNext = () => setPly(0);
+    // const onLast = () => setPly(0);
+    const onPrev = () => setPly((p) => Math.max(0, p - 1));
+    const onNext = () => setPly((p) => Math.min((moves.length ?? 1) - 1, p + 1));
+    const onLast = () => {setPly(moves.length - 1);
+    };
     
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
@@ -245,7 +267,7 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             <div className="mb-4 flex items-center justify-between">
             <div>
             <h3 className="text-base font-semibold">
-            {viewer.redName} <span className="text-slate-500">vs</span> {viewer.blackName}
+            {viewer.redUserId} <span className="text-slate-500">vs</span> {viewer.blackUserId}
             </h3>
             <p className="text-xs text-slate-400">{viewer.timeControl} • Result: {viewer.result}</p>
             </div>
@@ -253,15 +275,23 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             </div>
             
             <div className="grid gap-6 md:grid-cols-2">
+
             {/* Board preview (grid only, you can swap to your real board later) */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-3">
-            <div className="aspect-square rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 p-2">
+            {/* <div className="aspect-square rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 p-2">
             <div className="grid h-full grid-cols-9 grid-rows-10 gap-[2px]">
             {Array.from({ length: 90 }).map((_, i) => (
                 <div key={i} className="bg-slate-950/60" />
             ))}
             </div>
-            </div>
+            </div> */}
+            <Board
+            board={board}
+            selected={null}
+            legalTargets={[]}
+            sideToMove={sideToMove}
+            onSquareClick={() => {}}
+            />
             <div className="mt-3 flex items-center justify-between">
             <div className="flex gap-2">
             <button onClick={onFirst} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-800">⏮</button>
@@ -269,8 +299,10 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             <button onClick={onNext}  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-800">▶</button>
             <button onClick={onLast}  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs hover:bg-slate-800">⏭</button>
             </div>
-            {/* <div className="text-xs text-slate-400">Move {Math.min(ply + 1, viewer.moves.length)} / {viewer.moves.length}</div> */}
-            <div className="text-xs text-slate-400">Move {Math.min(ply + 1, 1)} / {1}</div> {/** error debugging code */}
+            <div className="text-xs text-slate-400">
+            Move {Math.min(ply + 1, moves.length)} / 
+            {moves.length}
+            </div>
             </div>
             </div>
             
@@ -278,17 +310,19 @@ const ReplayPage: React.FC<ReplayPageProps> = ({
             <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-3">
             <h4 className="mb-2 text-sm font-semibold">Moves</h4>
             <div className="max-h-96 overflow-auto rounded-xl border border-slate-800 bg-slate-950/40 p-2 text-sm leading-6">
-            {/* {viewer.moves.map((mv, i) => (
+            {moves.map((mv: string, i: number) => (
                 <button
-                key={i}
-                onClick={() => setPly(i)}
-                className={`mr-2 rounded px-2 py-1 text-xs ${
-                    i === ply ? "bg-red-600 text-white" : "bg-slate-800/60 text-slate-200 hover:bg-slate-800"
-                }`}
+                    key={i}
+                    onClick={() => setPly(i)}
+                    className={`mr-2 rounded px-2 py-1 text-xs ${
+                    i === ply
+                        ? "bg-red-600 text-white"
+                        : "bg-slate-800/60 text-slate-200 hover:bg-slate-800"
+                    }`}
                 >
-                {i + 1}. {mv}
+                    {i + 1}. {mv}
                 </button>
-            ))} */}
+            ))}
             </div>
             
             <div className="mt-4 grid grid-cols-2 gap-2">

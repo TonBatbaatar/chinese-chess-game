@@ -9,7 +9,17 @@ export type ReplayMeta = {
     createdAtUtc: string;  // DateTime → ISO string
     updatedAtUtc: string;
     moveCount: number;
+    result: string;
+    movesJson: string;
+};
+
+export type ReplayData = {
+    id: string;
+    redUserId: string;
+    blackUserId: string;
+    timeControl: string;
     result : string;
+    movesJson: string;
 };
 
 export interface ReplayQueryArgs {
@@ -42,5 +52,5 @@ export async function fetchReplays({ userId, finished, tc, fromUtc, toUtc, page,
 export async function fetchReplay(id: string) {
     const res = await fetch(apiUrl(`/api/replays/${id}`));
     if (!res.ok) throw new Error("Replay not found");
-    return res.json();
+    return res.json() as Promise<ReplayData>;
 }

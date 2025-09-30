@@ -118,6 +118,13 @@ function mapPieceLabel(type: string): string {
     case "Advisor": return "A"; // Advisor
     case "Cannon": return "C"; // Cannon
     case "Soldier": return "P"; // Pawn
+    case "K": return "G"; // King/General
+    case "R": return "R";
+    case "H": return "H";
+    case "E": return "E";
+    case "A": return "A";
+    case "C": return "C";
+    case "P": return "P";
     default: return "?";
   }
 }
