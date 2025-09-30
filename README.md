@@ -8,7 +8,7 @@
 ## 🎮 [Click here to play!](https://ashy-grass-0231f1603.2.azurestaticapps.net)  
 [![Play Guide](https://img.shields.io/badge/Play%20Guide-Instructions-blue)](#-how-to-play-online)
 
-**Status:** `v0.6.0` _(in development)_  
+**Status:** `v1.0.0`  
 **Stack:** ASP.NET Core · EF Core · SignalR · React (Vite + TS) · TailwindCSS · Azure  
 
 ## 🌐 Live Services 
@@ -30,10 +30,10 @@
 - [x] v0.4.0 — Stable multiplayer
 - [x] v0.5.0 — Persistence & accounts
 - [x] v0.6.0 — Frontend polish
-- [ ] v0.7.0 — Security & auth
-- [ ] v0.8.0 — Observability & CI/CD
-- [ ] v0.9.0 — Pre-production hardening
-- [ ] v1.0.0 — Production launch
+- [x] v0.7.0 — Security & auth
+- [x] v0.8.0 — Observability & CI/CD
+- [x] v0.9.0 — Pre-production hardening
+- [x] v1.0.0 — Production launch
 
 ## Run locally
 
